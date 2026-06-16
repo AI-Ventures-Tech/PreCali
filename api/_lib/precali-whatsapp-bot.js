@@ -183,7 +183,11 @@ function parseProfile(body) {
       text,
       ["prima", "enganche", "aporte"],
       ["debo", "deuda", "deudas", "pago", "pagos", "cuotas", "gano", "ingreso", "salario", "sueldo", "monto", "valor"]
-    ) || 0;
+    ) ||
+    findAmount(text, [
+      /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m))?)\s*(?:de\s+)?(?:prima|enganche|aporte)\b/,
+    ]) ||
+    0;
 
   const rawAssetValue =
     amountAfter(
@@ -287,7 +291,7 @@ function likelyDocumentFollowUp(body) {
   const text = normalizeTypos(normalizeAmountWords(normalize(body)));
   const mentionsIncomeContext = /(ingreso|ingresos|salario|sueldo|neto|devengo|orden patronal|colilla|boleta|documento|pdf|archivo|adjunto|estos son mis ingresos|te mando|no debo|sin deudas?|deuda cero)/.test(text);
   const mentionsIntent = /(carro|auto|vehiculo|veiculo|casa|vivienda|hipoteca|credito|prestamo|financiar)/.test(text);
-  return mentionsIncomeContext && mentionsIntent && !hasWrittenAmountCue(text);
+  return mentionsIncomeContext && mentionsIntent;
 }
 
 function productTitle(product) {
@@ -296,19 +300,29 @@ function productTitle(product) {
   return "credito personal";
 }
 
+function assetLabel(product) {
+  return product === "vehiculo" ? "vehiculo" : "bien";
+}
+
 function formatResults(profile, results) {
+  const hasAssetContext = profile.product !== "personal";
+  const hasDownPaymentOnly = hasAssetContext && profile.downPayment > 0 && !profile.assetValue;
   const lines = [
     "PreCali - comparativa preliminar",
     "Producto: " + productTitle(profile.product),
     "Ingreso: " + money(profile.income) + " | Deudas: " + money(profile.debt),
     profile.assetValue
       ? "Valor de referencia: " + money(profile.assetValue) + (profile.downPayment ? " | Prima: " + money(profile.downPayment) : "")
-      : "Sin valor del bien: estimo el monto maximo segun capacidad de pago.",
+      : hasDownPaymentOnly
+        ? "Sin valor del bien: estimo el monto maximo segun capacidad de pago. Prima detectada: " + money(profile.downPayment) + "."
+        : "Sin valor del bien: estimo el monto maximo segun capacidad de pago.",
     "",
   ];
 
   if (!results.length) {
-    lines.push("Con esos datos no encontre una opcion clara.");
+    lines.push(profile.downPayment && hasAssetContext
+      ? "Ya tome en cuenta tu prima de " + money(profile.downPayment) + ", pero con estos datos no encontre una opcion clara."
+      : "Con esos datos no encontre una opcion clara.");
     lines.push("Probemos bajando monto, subiendo prima, ampliando plazo o revisando deudas mensuales.");
     return lines.join("\n");
   }
@@ -324,6 +338,7 @@ function formatResults(profile, results) {
       `${index + 1}. ${result.bank}`,
       `Tasa: ${result.rate.toFixed(2)}% | Plazo: ${result.years} anos`,
       `${profile.assetValue ? "Monto financiado" : "Monto maximo estimado"}: ${money(result.amount)}`,
+      hasDownPaymentOnly ? `Valor total aprox con prima: ${money(result.amount + profile.downPayment)}` : null,
       `Cuota aprox: ${money(result.payment)}`,
       ""
     );
@@ -331,10 +346,10 @@ function formatResults(profile, results) {
 
   lines.push("Queres aplicar a alguna opcion? Responde: Aplicar BAC, Aplicar BN, etc.");
   if ((profile.product === "vehiculo" || profile.product === "hipoteca") && !profile.assetValue) {
-    lines.push("Si me decis el valor del " + (profile.product === "vehiculo" ? "vehiculo" : "bien") + " y la prima, te afino mucho mas la comparativa.");
+    lines.push("Si me decis el valor del " + assetLabel(profile.product) + (profile.downPayment ? ", te digo cuanto te financiarian exactamente." : " y la prima, te afino mucho mas la comparativa."));
   }
   lines.push("MVP: estimacion orientativa. El banco confirma aprobacion, tasa y requisitos finales.");
-  return lines.join("\n");
+  return lines.filter(Boolean).join("\n");
 }
 
 function buildReplyFromProfile(profile, options) {
@@ -383,6 +398,20 @@ function buildReply(input) {
     };
   }
 
+  const profile = parseProfile(body);
+
+  if (!profile.income && (
+    likelyDocumentFollowUp(body) ||
+    (profile.product !== "personal" && (profile.downPayment > 0 || profile.assetValue > 0 || /\b(no debo|sin deudas?|deuda cero)\b/.test(text)))
+  )) {
+    return {
+      message: [
+        "Perfecto. Mandame la orden patronal, colilla o PDF y saco el ingreso desde ahi.",
+        "Ya tengo presente si es casa o carro y cualquier prima o deuda que me hayas dicho.",
+      ].join("\n"),
+    };
+  }
+
   if (/(pdf|documento|orden|patronal|boleta|colilla|foto|imagen|adjunto|archivo)/.test(text) && !/(gano|ingreso|salario|sueldo|neto)/.test(text)) {
     return {
       message: [
@@ -413,16 +442,6 @@ function buildReply(input) {
     return {
       message:
         "El flujo final seria: PreCali te avisa por WhatsApp cuando el banco responda. Ejemplo: Tu credito fue aprobado; el banco se contactara con vos en las proximas horas.",
-    };
-  }
-
-  const profile = parseProfile(body);
-  if (!profile.income && likelyDocumentFollowUp(body)) {
-    return {
-      message: [
-        "Perfecto. Mandame la orden patronal, colilla o PDF y saco el ingreso desde ahi.",
-        "Si preferis escribirlo, tambien sirve: gano 1500000, no debo nada y quiero un carro.",
-      ].join("\n"),
     };
   }
 
