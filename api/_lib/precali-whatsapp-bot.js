@@ -280,6 +280,12 @@ function amountForPayment(payment, annualRate, years) {
   return payment * ((1 - Math.pow(1 + monthlyRate, -months)) / monthlyRate);
 }
 
+function maxLoanFromDownPayment(downPayment, financeRatio) {
+  const ratio = Number(financeRatio) || 0;
+  if (!downPayment || ratio <= 0 || ratio >= 1) return Number.MAX_SAFE_INTEGER;
+  return (downPayment * ratio) / (1 - ratio);
+}
+
 function simulate(profile) {
   const results = [];
   const netIncome = Math.max(0, profile.income - profile.debt);
@@ -290,14 +296,17 @@ function simulate(profile) {
     if (!condition) continue;
 
     const years = Math.min(profile.requestedYears, condition.maxYears);
-    const ratio = Math.max(0.4, Math.min(0.45, Number(condition.ratio) || 0.4));
+    const ratio = Math.min(0.45, Number(condition.ratio) || 0.4);
+    const finance = condition.finance || 0.85;
     const capacity = Math.max(0, profile.income * ratio - profile.debt);
     let amount = amountForPayment(capacity, condition.rate, years);
 
     if (profile.assetValue && profile.product !== "personal") {
-      const financeLimit = profile.assetValue * (condition.finance || 0.85);
+      const financeLimit = profile.assetValue * finance;
       const requested = Math.max(0, profile.assetValue - profile.downPayment);
       amount = Math.min(amount, financeLimit, requested || financeLimit);
+    } else if (profile.downPayment && profile.product !== "personal") {
+      amount = Math.min(amount, maxLoanFromDownPayment(profile.downPayment, finance));
     }
 
     const qualifies = profile.income >= condition.minIncome && amount >= condition.minAmount && capacity > 0;
@@ -312,6 +321,7 @@ function simulate(profile) {
       payment,
       capacity,
       ratio,
+      finance,
       minIncome: condition.minIncome,
       maxYears: condition.maxYears,
     });
@@ -605,7 +615,7 @@ function optimizationIdeas(profile) {
 
   if (targetLoan > 0 && bestRate) {
     const years = Math.min(profile.requestedYears, bestRate.condition.maxYears);
-    const ratio = Math.max(0.4, Math.min(0.45, Number(bestRate.condition.ratio) || 0.4));
+    const ratio = Math.min(0.45, Number(bestRate.condition.ratio) || 0.4);
     const currentCapacity = Math.max(0, profile.income * ratio - profile.debt);
     const currentLoan = amountForPayment(currentCapacity, bestRate.condition.rate, years);
     const financeLimit = profile.assetValue * (bestRate.condition.finance || 0.85);
@@ -673,6 +683,8 @@ function formatResults(profile, results, analysis) {
       : hasDownPaymentOnly
         ? "Sin valor del bien. Prima detectada: " + bold(money(profile.downPayment, profile.country)) + "."
         : "Sin valor del bien: estimo el monto maximo segun capacidad de pago.",
+    hasDownPaymentOnly ? "Tomo en cuenta tu capacidad y el porcentaje maximo que financia cada banco." : null,
+    hasDownPaymentOnly ? "Aqui el monto es " + bold("prestamo maximo") + ", no el valor total del bien." : null,
     "",
   ];
 
@@ -713,7 +725,8 @@ function formatResults(profile, results, analysis) {
       `${bold("Tasa de Interes")}: ${bold(result.rate.toFixed(2) + "%")}`,
       `${bold("Monto Maximo de Prestamo")}: ${bold(money(result.amount, profile.country))}`,
       `${bold("Cuota Mensual Estimada")}: ${bold(money(result.payment, profile.country))}`,
-      `${bold("Plazo")}: ${bold(result.years + " anos")}`
+      `${bold("Plazo")}: ${bold(result.years + " anos")}`,
+      hasDownPaymentOnly ? `Valor total aprox con tu prima: ${bold(money(result.amount + profile.downPayment, profile.country))}` : null
     );
   });
 
