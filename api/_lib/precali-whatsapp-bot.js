@@ -304,6 +304,24 @@ function assetLabel(product) {
   return product === "vehiculo" ? "vehiculo" : "bien";
 }
 
+function documentFollowUpMessage(profile) {
+  const hints = [];
+  if (profile.product === "vehiculo") hints.push("que buscas carro");
+  if (profile.product === "hipoteca") hints.push("que buscas casa");
+  if (profile.assetValue) hints.push("un monto meta de " + money(profile.assetValue));
+  if (profile.downPayment) hints.push("una prima de " + money(profile.downPayment));
+  if (profile.debt) hints.push("deudas por " + money(profile.debt));
+
+  const secondLine = hints.length
+    ? "Ya tengo presente " + hints.join(", ") + "."
+    : "Ya tengo presente si es casa o carro y cualquier monto, prima o deuda que me hayas dicho.";
+
+  return [
+    "Perfecto. Mandame la orden patronal, colilla o PDF y saco el ingreso desde ahi.",
+    secondLine,
+  ].join("\n");
+}
+
 function formatResults(profile, results) {
   const hasAssetContext = profile.product !== "personal";
   const hasDownPaymentOnly = hasAssetContext && profile.downPayment > 0 && !profile.assetValue;
@@ -404,12 +422,7 @@ function buildReply(input) {
     likelyDocumentFollowUp(body) ||
     (profile.product !== "personal" && (profile.downPayment > 0 || profile.assetValue > 0 || /\b(no debo|sin deudas?|deuda cero)\b/.test(text)))
   )) {
-    return {
-      message: [
-        "Perfecto. Mandame la orden patronal, colilla o PDF y saco el ingreso desde ahi.",
-        "Ya tengo presente si es casa o carro y cualquier prima o deuda que me hayas dicho.",
-      ].join("\n"),
-    };
+    return { message: documentFollowUpMessage(profile) };
   }
 
   if (/(pdf|documento|orden|patronal|boleta|colilla|foto|imagen|adjunto|archivo)/.test(text) && !/(gano|ingreso|salario|sueldo|neto)/.test(text)) {
