@@ -175,7 +175,7 @@ function defaultCurrencyForCountry(country) {
 }
 
 function detectCurrency(text, country, defaultCurrency) {
-  if (/\busd\b|dolares?|\$/.test(text)) return "USD";
+  if (/\busd\b|dolares?|\$|\bverdes?\b/.test(text)) return "USD";
   if (/\bcrc\b|colones?\b/.test(text)) return "CRC";
   if (/\bmxn\b|pesos?\b/.test(text) && country === "MX") return "MXN";
   if (/\bgtq\b|quetzales?\b/.test(text)) return "GTQ";
@@ -248,7 +248,7 @@ function amountAfter(text, labels, blockers) {
 }
 
 function detectProduct(text) {
-  if (/(casa|vivienda|hipoteca|hipotecario|apartamento|departamento|apto|lote|terreno|propiedad|inmueble|condominio)/.test(text)) {
+  if (/(casa|vivienda|hipoteca|hipotecario|apartamento|departamento|apto|depa|lote|terreno|propiedad|inmueble|condominio)/.test(text)) {
     return "hipoteca";
   }
   if (/(carro|auto|vehiculo|veiculo|vehicular|moto|prendario|pickup|pick up|camioneta)/.test(text)) {
@@ -272,7 +272,7 @@ function parseProfile(body, options) {
   const income =
     amountAfter(
       text,
-      ["gano", "gana", "ganamos", "ganan", "ingreso", "ingresos", "salario", "sueldo", "neto", "devengo", "me quedan libres", "me quedan", "recibo"],
+      ["gano", "gana", "ganamos", "ganan", "ingreso", "ingresos", "salario", "sueldo", "neto", "devengo", "me quedan libres", "me quedan", "me deja", "recibo", "brete"],
       ["debo", "deuda", "deudas", "pago", "pagos", "cuotas", "prima", "enganche", "aporte", "abono", "carro", "auto", "vehiculo", "veiculo", "casa", "vivienda", "monto", "valor"]
     ) ||
     findAmount(text, [
@@ -296,19 +296,20 @@ function parseProfile(body, options) {
   const downPayment =
     amountAfter(
       text,
-      ["prima", "enganche", "aporte", "abono", "ahorrados", "ahorrado", "tengo ahorrados", "tengo ahorrado"],
+      ["prima", "enganche", "aporte", "abono", "ahorrados", "ahorrado", "guardados", "guardado", "tengo ahorrados", "tengo ahorrado", "tengo guardados", "tengo guardado"],
       ["debo", "deuda", "deudas", "pago", "pagos", "cuotas", "gano", "ingreso", "salario", "sueldo", "monto", "valor"]
     ) ||
     findAmount(text, [
       /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m))?)\s*(?:usd|dolares?|crc|colones?|mxn|pesos?|gtq|quetzales?|hnl|lempiras?|nio|cordobas?)?\s*(?:de\s+)?(?:prima|enganche|aporte|abono)\b/,
-      /ahorrad[oa]s?\D{0,12}([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m))?)/,
+      /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m))?)\s*(?:usd|dolares?|crc|colones?|mxn|pesos?|gtq|quetzales?|hnl|lempiras?|nio|cordobas?|verdes?)?\s*(?:ahorrad[oa]s?|guardad[oa]s?)\b/,
+      /(?:ahorrad[oa]s?|guardad[oa]s?)\D{0,12}([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m))?)/,
     ]) ||
     0;
 
   const rawAssetValue =
     amountAfter(
       text,
-      ["valor", "monto", "vale", "cuesta", "hipoteca", "hipotecario", "casa", "vivienda", "propiedad", "apartamento", "apto", "lote", "terreno", "carro", "auto", "vehiculo", "veiculo", "prestamo", "credito", "financiar", "financiamiento", "ocupo", "necesito", "nesesito"],
+      ["valor", "monto", "vale", "cuesta", "hipoteca", "hipotecario", "casa", "vivienda", "propiedad", "apartamento", "apto", "depa", "lote", "terreno", "carro", "auto", "vehiculo", "veiculo", "prestamo", "credito", "financiar", "financiamiento", "ocupo", "necesito", "nesesito"],
       ["gano", "ingreso", "ingresos", "salario", "sueldo", "neto", "devengo", "debo", "deuda", "deudas", "pago", "pagos", "cuotas", "prima", "enganche", "aporte", "tengo", "contamos", "tenemos"]
     );
   const assetValue = rawAssetValue >= minimumAssetInput(currency) ? rawAssetValue : 0;
@@ -1150,7 +1151,7 @@ function buildReply(input) {
     return { message: documentFollowUpMessage(profile) };
   }
 
-  if (/(pdf|documento|orden|patronal|boleta|colilla|foto|imagen|adjunto|archivo)/.test(text) && !/(gano|ingreso|salario|sueldo|neto)/.test(text)) {
+  if (/\b(pdf|documento|orden|patronal|boleta|colilla|foto|imagen|adjunto|archivo)\b/.test(text) && !/(gano|ingreso|salario|sueldo|neto)/.test(text)) {
     return {
       message: [
         "Mandamelo por este chat.",

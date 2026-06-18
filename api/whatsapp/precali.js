@@ -165,7 +165,7 @@ function explicitCountryFromBody(body) {
 
 function explicitCurrencyFromBody(body, country) {
   const text = normalizeForIntent(body);
-  if (/\busd\b|dolares?\b|\$/.test(text)) return "USD";
+  if (/\busd\b|dolares?\b|\$|\bverdes?\b/.test(text)) return "USD";
   if (/\bcrc\b|colones?\b/.test(text)) return "CRC";
   if (/\bmxn\b|pesos?\b/.test(text) && country === "MX") return "MXN";
   if (/\bgtq\b|quetzales?\b/.test(text)) return "GTQ";
@@ -190,7 +190,7 @@ function explicitCountryFromPhone(from) {
 function explicitProductFromBody(body) {
   const text = normalizeForIntent(body);
   if (/(de un prestamo personal|de una deuda personal|deuda personal|tarjeta de credito|deuda de tarjeta)/.test(text)) return "";
-  if (/(casa|vivienda|hipoteca|hipotecario|apartamento|apto|lote|terreno|propiedad|inmueble)/.test(text)) return "hipoteca";
+  if (/(casa|vivienda|hipoteca|hipotecario|apartamento|apto|depa|lote|terreno|propiedad|inmueble)/.test(text)) return "hipoteca";
   if (/(carro|auto|vehiculo|veiculo|vehicular|moto|prendario|pickup|pick up|camioneta)/.test(text)) return "vehiculo";
   if (/(personal|consumo|libre inversion|gastos personales)/.test(text)) return "personal";
   return "";
