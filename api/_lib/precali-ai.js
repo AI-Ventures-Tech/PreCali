@@ -399,6 +399,94 @@ async function callGroq({ body, recentMessages, documentText }) {
   return normalizeAiResult(parsed);
 }
 
+function buildGroqAdvisorPrompt(input) {
+  const historyLines = Array.isArray(input.recentMessages) && input.recentMessages.length
+    ? input.recentMessages.slice(-5).map((item, index) => `${index + 1}. ${String(item)}`).join("\n")
+    : "(sin contexto previo)";
+  const profile = input.profile || {};
+  const options = Array.isArray(input.results) ? input.results.slice(0, 4) : [];
+  const optionLines = options.length
+    ? options.map((item, index) => [
+        `${index + 1}. ${item.bank}`,
+        `tasa ${item.rate}%`,
+        `monto ${item.amount}`,
+        `cuota ${item.payment}`,
+        `plazo ${item.years} anos`,
+      ].join(" | ")).join("\n")
+    : "(sin opciones calculadas)";
+
+  return [
+    "Sos PreCali IA, asesor financiero por WhatsApp.",
+    "Responde como humano: claro, directo, empatico y util.",
+    "Usa SOLO los datos del perfil y opciones calculadas abajo. No inventes bancos, tasas, aprobaciones ni requisitos.",
+    "Si el usuario pregunta si deberia aplicar, da criterio y aclara que sigue siendo precalificacion.",
+    "No mandes una tabla completa si el usuario hizo una duda puntual.",
+    "Maximo 5 lineas cortas. Termina con una pregunta concreta de siguiente paso.",
+    "",
+    "Contexto reciente:",
+    historyLines,
+    "",
+    "Mensaje actual:",
+    input.body || "(sin texto)",
+    "",
+    "Perfil calculado:",
+    JSON.stringify(profile),
+    "",
+    "Opciones calculadas:",
+    optionLines,
+    "",
+    'Devuelve SOLO JSON valido con esta forma: {"message":"respuesta para WhatsApp","confidence":0.0}',
+  ].join("\n");
+}
+
+async function writeAdvisorReplyWithPreCaliAi(input) {
+  if (!aiEnabled(input) || activeAiProvider(input) !== "groq") return null;
+  if (process.env.PRECALI_AI_TEXT !== "1") return null;
+
+  const response = await fetch(GROQ_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
+      temperature: 0.35,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "Sos PreCali IA. Redacta respuestas financieras breves usando solo los datos proporcionados.",
+        },
+        {
+          role: "user",
+          content: buildGroqAdvisorPrompt(input),
+        },
+      ],
+    }),
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    const error = new Error(`groq_advisor_${response.status}`);
+    error.status = response.status;
+    error.body = raw.slice(0, 1000);
+    throw error;
+  }
+
+  const data = safeJsonParse(raw);
+  const outputText = data && data.choices && data.choices[0] && data.choices[0].message
+    ? data.choices[0].message.content
+    : "";
+  const parsed = safeJsonParse(outputText);
+  if (!parsed || !parsed.message) throw new Error("groq_advisor_invalid_json");
+
+  return {
+    message: String(parsed.message).slice(0, 900),
+    confidence: Math.max(0, Math.min(1, Number(parsed.confidence || 0))),
+  };
+}
+
 async function analyzeWithPreCaliAi(input) {
   if (!shouldUseAiForMessage(input)) return null;
   const provider = activeAiProvider(input);
@@ -411,5 +499,6 @@ module.exports = {
   activeAiProvider,
   shouldUseAiForMessage,
   analyzeWithPreCaliAi,
+  writeAdvisorReplyWithPreCaliAi,
   normalizeAiResult,
 };

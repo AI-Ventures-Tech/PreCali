@@ -93,7 +93,7 @@ const COUNTRY_CONFIG = {
   US: { name: "Estados Unidos", defaultCurrency: "USD", currencies: { USD: { locale: "en-US", scale: 540 } } },
 };
 
-const AMOUNT_PATTERN = /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m)\b)?)/;
+const AMOUNT_PATTERN = /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m)\b)?(?:\s+[\d.,]+\s*mil\b)?)/;
 
 function normalize(text) {
   return String(text || "")
@@ -207,7 +207,17 @@ function toInternalAmount(value, country, currency) {
 function parseAmount(raw) {
   if (!raw) return 0;
 
-  const compact = String(raw).toLowerCase().replace(/[,\s]/g, "");
+  const text = String(raw).toLowerCase();
+  const compound = text.match(/([\d.,]+)\s*(?:millones|millon|mill|m)\b\s+([\d.,]+)\s*mil\b/);
+  if (compound) {
+    const millions = Number(compound[1].replace(/[,\s]/g, ""));
+    const thousands = Number(compound[2].replace(/[,\s]/g, ""));
+    if (Number.isFinite(millions) && Number.isFinite(thousands)) {
+      return millions * 1000000 + thousands * 1000;
+    }
+  }
+
+  const compact = text.replace(/[,\s]/g, "");
   const number = Number(compact.replace(/[^\d.]/g, ""));
   if (!Number.isFinite(number)) return 0;
 
@@ -643,6 +653,19 @@ function recommendedOption(results, profile) {
   return results.slice().sort((a, b) => a.payment - b.payment || a.rate - b.rate)[0];
 }
 
+function mentionedResult(results, text) {
+  const normalizedText = normalize(text);
+  const compactText = normalizedText.replace(/[^a-z0-9]/g, "");
+  return results.find((result) => {
+    const compactBank = normalize(result.bank).replace(/[^a-z0-9]/g, "");
+    if (compactBank && compactText.includes(compactBank)) return true;
+    if (/davi/.test(compactText) && /davi/.test(compactBank)) return true;
+    if (/\bbac\b/.test(normalizedText) && /bac/.test(compactBank)) return true;
+    if (/\bbn\b/.test(normalizedText) && /banconacional/.test(compactBank)) return true;
+    return false;
+  }) || null;
+}
+
 function buildFollowUpReply(profile, results, analysis, body) {
   const text = normalizeTypos(normalizeAmountWords(normalize(body)));
   const best = results[0] || null;
@@ -717,6 +740,40 @@ function buildFollowUpReply(profile, results, analysis, body) {
         : "Prefiero la opcion que mejor cuide tu cuota mensual.",
       "Eso normalmente pesa mas que ahorrar unas decimas en la tasa si el presupuesto queda apretado.",
       closingQuestion("Queres que te ordene las opciones por cuota mas comoda en vez de tasa?"),
+    ].join("\n");
+  }
+
+  if (/(deberia|debo|conviene|recomiendas|recomendarias|vale la pena|seria bueno|seria mejor).{0,50}aplicar|aplicar a/.test(text) && results.length) {
+    const choice = mentionedResult(results, text) || recommendedOption(results, profile) || best;
+    const burden = choice ? Math.round((choice.payment / Math.max(1, profile.income - profile.debt)) * 100) : 0;
+    const lines = [
+      choice
+        ? `Si, ${bold(choice.bank)} tiene sentido para explorar primero.`
+        : "Si, tiene sentido avanzar con la opcion mas sana.",
+      choice
+        ? `La cuota estimada queda cerca de ${bold(burden + "%")} de tu ingreso neto.`
+        : "Pero antes quiero cuidar que la cuota no te apriete.",
+    ];
+
+    if (profile.product === "vehiculo" && !profile.assetValue) {
+      lines.push("Antes de aplicar formalmente, confirmaria valor, ano y modelo del carro.");
+    } else if (profile.product === "hipoteca" && !profile.assetValue) {
+      lines.push("Antes de aplicar formalmente, confirmaria el valor real de la propiedad.");
+    }
+
+    lines.push("Esto sigue siendo precalificacion, no aprobacion final.");
+    lines.push(closingQuestion(choice ? `Queres que te envie el consentimiento para ${choice.bank}?` : "Queres que te envie el consentimiento para iniciar?"));
+    return lines.join("\n");
+  }
+
+  if (/\b(aplicar|solicitar|me interesa|quiero esa|enviar|mandar)\b/.test(text) && results.length) {
+    const choice = mentionedResult(results, text) || recommendedOption(results, profile) || best;
+    return [
+      choice ? `Perfecto. Seguimos con ${bold(choice.bank)}.` : "Perfecto. Seguimos con la opcion mas sana.",
+      "El siguiente paso es tu consentimiento digital.",
+      "Con eso validamos tu perfil real con el banco.",
+      "Puede incluir revision suave o formal segun el proceso.",
+      closingQuestion(choice ? `Te envio el consentimiento para ${choice.bank}?` : "Te envio el consentimiento para iniciar?"),
     ].join("\n");
   }
 

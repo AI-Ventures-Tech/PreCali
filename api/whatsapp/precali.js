@@ -1,5 +1,5 @@
-const { buildReply, buildReplyFromProfile, coerceProfile, parseProfile } = require("../_lib/precali-whatsapp-bot");
-const { analyzeWithPreCaliAi, shouldUseAiForMessage } = require("../_lib/precali-ai");
+const { buildReply, buildReplyFromProfile, coerceProfile, parseProfile, simulate } = require("../_lib/precali-whatsapp-bot");
+const { analyzeWithPreCaliAi, shouldUseAiForMessage, writeAdvisorReplyWithPreCaliAi } = require("../_lib/precali-ai");
 const { readPreCaliDocument } = require("../_lib/precali-documents");
 const { fetchTwilioMedia } = require("../_lib/twilio-media");
 
@@ -221,6 +221,25 @@ function bodyAddsCoBorrower(body) {
   return /\b(sumamos|agregamos|metemos|incluimos|mi esposa|mi esposa gana|mi esposo|mi pareja|co-deudor|co deudor|copropietario|co-propietario|entre los dos|adicionales)\b/.test(normalizeForIntent(body));
 }
 
+function bodyAsksApplicationAdvice(body) {
+  const text = normalizeForIntent(body);
+  return /(deberia|debo|conviene|recomiendas|recomendarias|vale la pena|seria bueno|seria mejor).{0,50}aplicar|aplicar a.+\?/.test(text);
+}
+
+function bodyIsDirectApplicationCommand(body) {
+  const text = normalizeForIntent(body);
+  if (bodyAsksApplicationAdvice(body)) return false;
+  if (/(gano|ingreso|salario|sueldo|neto|debo|deuda|prima|enganche|monto|valor)/.test(text)) return false;
+  return /\b(aplicar|solicitar|me interesa|quiero esa|enviar|mandar)\b/.test(text);
+}
+
+function bodyNeedsAdvisorReply(body) {
+  const text = normalizeForIntent(body);
+  return bodyAsksApplicationAdvice(body) ||
+    /\?/.test(String(body || "")) ||
+    /\b(cual|mejor|conviene|recomiendas|recomendarias|por que|porque|duda|explicame|incluye|seguro|seguros|cuota|tasa|aplicar)\b/.test(text);
+}
+
 function mergeDocumentAndMessageProfile(documentProfile, body, defaultCountry) {
   const doc = documentProfile || {};
   const productHint = explicitProductFromBody(body);
@@ -320,7 +339,13 @@ function shouldUseRememberedProfile(input, rememberedProfile) {
   const hasFollowUpCue = /^(y|si|y si)\b/.test(normalized) || /\b(ahora|mas bien|mejor|entonces)\b/.test(normalized);
   const hasValidationQuestion = /\?|\b(tanto|esa prima|ese monto|ese maximo|la cuota|incluye seguros|incluye seguro|puedo bajar|puedo subir|plazo|anos|anios|modelo|version)\b/.test(normalized);
 
-  if (/(^|\b)(hola|buenas|menu|ayuda|inicio|empezar|hey|ola|aplicar|solicitar|me interesa|quiero esa|enviar|mandar|estado|aprobado|rechazado|seguimiento)\b/.test(normalized)) {
+  if (/(^|\b)(hola|buenas|menu|ayuda|inicio|empezar|hey|ola|estado|aprobado|rechazado|seguimiento)\b/.test(normalized)) {
+    return false;
+  }
+
+  if (bodyIsDirectApplicationCommand(body)) return true;
+
+  if (/(^|\b)(aplicar|solicitar|me interesa|quiero esa|enviar|mandar)\b/.test(normalized) && !bodyAsksApplicationAdvice(body)) {
     return false;
   }
 
@@ -495,19 +520,42 @@ module.exports = async function handler(req, res) {
     }
 
     const rememberedProfile = readRecentProfile(input.from);
+    if (!reply && bodyIsDirectApplicationCommand(input.body) && !rememberedProfile) {
+      reply = buildReply(input);
+    }
+
     if (!reply && shouldUseRememberedProfile(input, rememberedProfile)) {
       const merged = mergeRememberedProfileWithBody(rememberedProfile, input.body);
-      const prefixLines = ["Recalculé con lo nuevo que me dijiste."];
+      const prefixLines = [];
+      if (!bodyAsksApplicationAdvice(input.body) && merged.usedMessageHints.length) {
+        prefixLines.push("Actualice tu escenario con lo nuevo.");
+      }
       if (merged.usedMessageHints.length) {
         prefixLines.push("Actualicé: " + merged.usedMessageHints.join(", ") + ".");
       }
       rememberRecentProfile(input.from, merged.profile, buildContextBody(input));
       usedRememberedProfile = true;
-      reply = buildReplyFromProfile(merged.profile, {
-        prefixLines,
-        followUpBody: input.body,
-        allowEstimateWithoutDownPayment: true,
-      });
+      let advisorReply = null;
+      if (bodyNeedsAdvisorReply(input.body)) {
+        try {
+          advisorReply = await writeAdvisorReplyWithPreCaliAi({
+            ...input,
+            profile: merged.profile,
+            results: simulate(merged.profile),
+            recentMessages: readRecentMessages(input.from),
+          });
+        } catch (advisorError) {
+          advisorReply = null;
+        }
+      }
+
+      reply = advisorReply && advisorReply.confidence >= 0.55
+        ? { message: advisorReply.message }
+        : buildReplyFromProfile(merged.profile, {
+            prefixLines,
+            followUpBody: input.body,
+            allowEstimateWithoutDownPayment: true,
+          });
     }
 
     if (!reply && shouldUseAiForMessage(input)) {
