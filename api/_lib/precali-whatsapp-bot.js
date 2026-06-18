@@ -3,39 +3,39 @@ const BANKS = [
     id: "bac",
     name: "BAC Credomatic",
     country: "CR",
-    vehiculo: { rate: 9.25, maxYears: 8, ratio: 0.32, minIncome: 750000, minAmount: 5000000, finance: 0.85 },
-    personal: { rate: 18.0, maxYears: 5, ratio: 0.32, minIncome: 500000, minAmount: 500000 },
-    hipoteca: { rate: 9.5, maxYears: 30, ratio: 0.35, minIncome: 750000, minAmount: 10000000, finance: 0.85 },
+    vehiculo: { rate: 9.25, maxYears: 8, ratio: 0.32, minIncome: 750000, minAmount: 5000000, finance: 0.85, terms: { USD: { currency: "USD", rate: 8.25, maxYears: 7, ratio: 0.3, minIncome: 1400, minAmount: 10000, finance: 0.8 } } },
+    personal: { rate: 18.0, maxYears: 5, ratio: 0.32, minIncome: 500000, minAmount: 500000, terms: { USD: { currency: "USD", rate: 14.0, maxYears: 5, ratio: 0.3, minIncome: 900, minAmount: 1000 } } },
+    hipoteca: { rate: 9.5, maxYears: 30, ratio: 0.35, minIncome: 750000, minAmount: 10000000, finance: 0.85, terms: { USD: { currency: "USD", rate: 8.25, maxYears: 30, ratio: 0.35, minIncome: 1500, minAmount: 30000, finance: 0.8 } } },
   },
   {
     id: "bn",
     name: "Banco Nacional",
     country: "CR",
-    vehiculo: { rate: 8.9, maxYears: 8, ratio: 0.4, minIncome: 400000, minAmount: 2000000, finance: 0.85 },
-    personal: { rate: 16.57, maxYears: 8, ratio: 0.4, minIncome: 400000, minAmount: 500000 },
-    hipoteca: { rate: 9.0, maxYears: 30, ratio: 0.35, minIncome: 600000, minAmount: 5000000, finance: 0.9 },
+    vehiculo: { rate: 8.9, maxYears: 8, ratio: 0.4, minIncome: 400000, minAmount: 2000000, finance: 0.85, terms: { USD: { currency: "USD", rate: 8.5, maxYears: 8, ratio: 0.38, minIncome: 800, minAmount: 5000, finance: 0.8 } } },
+    personal: { rate: 16.57, maxYears: 8, ratio: 0.4, minIncome: 400000, minAmount: 500000, terms: { USD: { currency: "USD", rate: 13.5, maxYears: 6, ratio: 0.35, minIncome: 800, minAmount: 1000 } } },
+    hipoteca: { rate: 9.0, maxYears: 30, ratio: 0.35, minIncome: 600000, minAmount: 5000000, finance: 0.9, terms: { USD: { currency: "USD", rate: 8.0, maxYears: 30, ratio: 0.35, minIncome: 1200, minAmount: 20000, finance: 0.85 } } },
   },
   {
     id: "davibank",
     name: "DaviBank",
     country: "CR",
-    vehiculo: { rate: 8.95, maxYears: 8, ratio: 0.32, minIncome: 650000, minAmount: 3000000, finance: 0.9 },
-    personal: { rate: 19.0, maxYears: 5, ratio: 0.32, minIncome: 500000, minAmount: 500000 },
+    vehiculo: { rate: 8.95, maxYears: 8, ratio: 0.32, minIncome: 650000, minAmount: 3000000, finance: 0.9, terms: { USD: { currency: "USD", rate: 8.6, maxYears: 7, ratio: 0.3, minIncome: 1200, minAmount: 7000, finance: 0.85 } } },
+    personal: { rate: 19.0, maxYears: 5, ratio: 0.32, minIncome: 500000, minAmount: 500000, terms: { USD: { currency: "USD", rate: 15.0, maxYears: 5, ratio: 0.3, minIncome: 900, minAmount: 1000 } } },
   },
   {
     id: "promerica",
     name: "Promerica",
     country: "CR",
-    vehiculo: { rate: 8.25, maxYears: 8, ratio: 0.33, minIncome: 600000, minAmount: 2500000, finance: 0.85 },
-    hipoteca: { rate: 12.0, maxYears: 30, ratio: 0.35, minIncome: 750000, minAmount: 10000000, finance: 0.85 },
+    vehiculo: { rate: 8.25, maxYears: 8, ratio: 0.33, minIncome: 600000, minAmount: 2500000, finance: 0.85, terms: { USD: { currency: "USD", rate: 7.95, maxYears: 7, ratio: 0.32, minIncome: 1100, minAmount: 6000, finance: 0.8 } } },
+    hipoteca: { rate: 12.0, maxYears: 30, ratio: 0.35, minIncome: 750000, minAmount: 10000000, finance: 0.85, terms: { USD: { currency: "USD", rate: 8.9, maxYears: 30, ratio: 0.35, minIncome: 1500, minAmount: 30000, finance: 0.8 } } },
   },
   {
     id: "lafise",
     name: "Lafise",
     country: "CR",
-    vehiculo: { rate: 10.5, maxYears: 7, ratio: 0.4, minIncome: 600000, minAmount: 2000000, finance: 0.85 },
-    personal: { rate: 24.0, maxYears: 5, ratio: 0.35, minIncome: 500000, minAmount: 500000 },
-    hipoteca: { rate: 10.0, maxYears: 30, ratio: 0.35, minIncome: 700000, minAmount: 8000000, finance: 0.8 },
+    vehiculo: { rate: 10.5, maxYears: 7, ratio: 0.4, minIncome: 600000, minAmount: 2000000, finance: 0.85, terms: { USD: { currency: "USD", rate: 9.25, maxYears: 6, ratio: 0.35, minIncome: 1100, minAmount: 5000, finance: 0.8 } } },
+    personal: { rate: 24.0, maxYears: 5, ratio: 0.35, minIncome: 500000, minAmount: 500000, terms: { USD: { currency: "USD", rate: 17.0, maxYears: 5, ratio: 0.32, minIncome: 900, minAmount: 1000 } } },
+    hipoteca: { rate: 10.0, maxYears: 30, ratio: 0.35, minIncome: 700000, minAmount: 8000000, finance: 0.8, terms: { USD: { currency: "USD", rate: 8.7, maxYears: 25, ratio: 0.35, minIncome: 1300, minAmount: 25000, finance: 0.75 } } },
   },
   {
     id: "bbva-mx",
@@ -358,6 +358,12 @@ function detectProduct(text) {
   return "personal";
 }
 
+function minimumAssetInput(currency) {
+  if (currency === "USD") return 1000;
+  if (currency === "GTQ" || currency === "HNL" || currency === "NIO") return 10000;
+  return 100000;
+}
+
 function parseProfile(body, options) {
   const text = normalizeTypos(normalizeAmountWords(normalize(body)));
   const product = detectProduct(text);
@@ -406,7 +412,7 @@ function parseProfile(body, options) {
       ["valor", "monto", "vale", "cuesta", "hipoteca", "hipotecario", "casa", "vivienda", "propiedad", "apartamento", "apto", "lote", "terreno", "carro", "auto", "vehiculo", "veiculo", "prestamo", "credito", "financiar", "financiamiento", "ocupo", "necesito", "nesesito"],
       ["gano", "ingreso", "ingresos", "salario", "sueldo", "neto", "devengo", "debo", "deuda", "deudas", "pago", "pagos", "cuotas", "prima", "enganche", "aporte", "tengo", "contamos", "tenemos"]
     );
-  const assetValue = rawAssetValue >= 100000 ? rawAssetValue : 0;
+  const assetValue = rawAssetValue >= minimumAssetInput(currency) ? rawAssetValue : 0;
   const downPaymentPercentMatch = text.match(/(\d{1,2})\s*%\s*(?:de\s+)?(?:prima|enganche|aporte)/);
   const downPaymentFromPercent = downPaymentPercentMatch && assetValue > 0
     ? Math.round(assetValue * (Number(downPaymentPercentMatch[1]) / 100))
@@ -473,13 +479,16 @@ function conditionForProfile(bank, profile) {
   if (!base) return null;
 
   const bankCurrency = base.currency || defaultCurrencyForCountry(bank.country || profile.country);
-  const rate = base.rates ? Number(base.rates[profile.currency] || base.rates[bankCurrency] || base.rate) : Number(base.rate);
+  const currencyTerms = base.terms && base.terms[profile.currency] ? base.terms[profile.currency] : null;
+  const merged = currencyTerms ? { ...base, ...currencyTerms } : base;
+  const conditionCurrency = merged.currency || bankCurrency;
+  const rate = merged.rates ? Number(merged.rates[profile.currency] || merged.rates[bankCurrency] || merged.rate) : Number(merged.rate);
 
   return {
-    ...base,
+    ...merged,
     rate,
-    minIncome: toInternalAmount(base.minIncome, bank.country || profile.country, bankCurrency),
-    minAmount: toInternalAmount(base.minAmount, bank.country || profile.country, bankCurrency),
+    minIncome: toInternalAmount(merged.minIncome, bank.country || profile.country, conditionCurrency),
+    minAmount: toInternalAmount(merged.minAmount, bank.country || profile.country, conditionCurrency),
   };
 }
 
