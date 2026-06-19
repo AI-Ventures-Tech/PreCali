@@ -612,6 +612,17 @@ module.exports = async function handler(req, res) {
       reply = buildReply(input);
     }
 
+    if (!reply && !rememberedProfile) {
+      const localAdvisorReply = buildReply(input);
+      if (shouldKeepLocalAdvisorReply(input, localAdvisorReply)) {
+        reply = localAdvisorReply;
+        replyProfile = parseProfile(input.body || "", {
+          defaultCountry: input.defaultCountry,
+          defaultCurrency: input.defaultCurrency,
+        });
+      }
+    }
+
     if (!reply && shouldUseRememberedProfile(input, rememberedProfile)) {
       const merged = mergeRememberedProfileWithBody(rememberedProfile, input.body);
       replyProfile = merged.profile;
