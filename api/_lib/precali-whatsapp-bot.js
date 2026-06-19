@@ -446,6 +446,7 @@ function simulate(profile) {
       finance,
       minIncome: condition.minIncome,
       maxYears: condition.maxYears,
+      requirements: condition.requirements || [],
     });
   }
 
@@ -721,6 +722,25 @@ function buildOriginacionReply(body, profile, results) {
   return "";
 }
 
+function compactRequirements(result) {
+  const requirements = Array.isArray(result && result.requirements) ? result.requirements : [];
+  const items = [];
+  for (const group of requirements) {
+    for (const item of group.items || []) {
+      if (items.length >= 4) break;
+      items.push(item);
+    }
+    if (items.length >= 4) break;
+  }
+  if (items.length) return items;
+  return [
+    "identificacion vigente",
+    "comprobante de ingresos",
+    "autorizacion para estudio crediticio",
+    "documento del bien o proforma si aplica",
+  ];
+}
+
 function buildFollowUpReply(profile, results, analysis, body) {
   const text = normalizeTypos(normalizeAmountWords(normalize(body)));
   const best = results[0] || null;
@@ -734,6 +754,17 @@ function buildFollowUpReply(profile, results, analysis, body) {
       choice ? `Voy a preparar tu perfil para ${bold(choice.bank)}.` : "Voy a preparar tu perfil con la opcion mas sana.",
       "Para dejarlo listo, necesito confirmar los datos finales del expediente.",
       closingQuestion(profile.product === "vehiculo" ? "Me pasas valor, ano y modelo del carro?" : "Me pasas valor de la propiedad y ubicacion?"),
+    ].join("\n");
+  }
+
+  if (/(requisitos?|documentos?|que pide|qu[eé] pide|ocupo|necesito llevar|necesito presentar)/.test(text) && results.length) {
+    const choice = mentionedResult(results, text) || recommendedOption(results, profile) || best;
+    const items = compactRequirements(choice);
+    return [
+      choice ? `Para ${bold(choice.bank)}, normalmente revisamos esto primero:` : "Normalmente revisamos esto primero:",
+      items.map((item) => `• ${item}`).join("\n"),
+      "Antes de enviarlo al banco, te pedimos consentimiento por este chat.",
+      closingQuestion(choice ? `Queres que preparemos tu expediente para ${choice.bank}?` : "Queres que preparemos tu expediente digital?"),
     ].join("\n");
   }
 
