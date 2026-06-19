@@ -616,10 +616,10 @@ function buildProfileAdvice(profile, analysis, results) {
 }
 
 function defaultNextQuestion(analysis) {
-  if (analysis.debtConsolidator) return "¿Querés que te deje la mejor ruta para aplicar después de ordenar tus deudas?";
-  if (analysis.independent) return "¿Querés que te deje la mejor opcion para aplicar con estados de cuenta?";
-  if (analysis.coBorrower) return "¿Querés que te prepare una ruta para aplicar con este escenario?";
-  return "¿Querés que te deje la mejor opcion para aplicar?";
+  if (analysis.debtConsolidator) return "Queres que te deje la mejor ruta para aplicar despues de ordenar tus deudas?";
+  if (analysis.independent) return "Queres que te prepare la aplicacion digital con estados de cuenta?";
+  if (analysis.coBorrower) return "Queres que preparemos la aplicacion digital con ambos ingresos?";
+  return "Con cual banco queres iniciar la aplicacion digital?";
 }
 
 function recommendedDownPaymentRange(product) {
@@ -666,9 +666,65 @@ function mentionedResult(results, text) {
   }) || null;
 }
 
+function buildOriginacionReply(body, profile, results) {
+  const text = normalizeTypos(normalizeAmountWords(normalize(body)));
+  const choice = Array.isArray(results) && results.length ? recommendedOption(results, profile || {}) : null;
+  const bankText = choice ? ` para ${bold(choice.bank)}` : "";
+
+  if (/(bur[oó]|buro|score|mancha|historial|soft pull|hard pull|consulta|estudio crediticio|me baja|me afecta)/.test(text)) {
+    return [
+      "Buena pregunta.",
+      `Primero te pedimos autorizacion para un ${bold("estudio crediticio inicial")} y perfilar tus opciones.`,
+      `Si te conviene aplicar${bankText}, ahi si autorizas la revision formal del banco.`,
+      closingQuestion("Nos autorizas realizar tu estudio crediticio inicial?"),
+    ].join("\n");
+  }
+
+  if (/(seguridad|datos|documentos|privacidad|orden patronal|colilla|boleta|cedula|informacion)/.test(text) && /(seguridad|datos|documentos|privacidad|manejan|guardan|envian|protegen)/.test(text)) {
+    return [
+      "Si, lo manejamos con mucho cuidado.",
+      "Usamos tus datos solo para perfilarte y preparar la aplicacion al banco que elijas.",
+      "Antes de enviar nada al banco, te pedimos consentimiento por este chat.",
+      closingQuestion("Queres que avancemos con la validacion inicial?"),
+    ].join("\n");
+  }
+
+  if (/(costo|cuesta|cobran|cobro|gratis|gratuito|comision|pagar|pago)/.test(text)) {
+    return [
+      `Para vos, la precalificacion por PreCali es ${bold("sin costo")}.`,
+      "Nuestro modelo es trabajar con la entidad financiera cuando se concreta una aplicacion.",
+      "No te cobramos por comparar ni por iniciar el proceso digital.",
+      closingQuestion("Queres que sigamos con la aplicacion digital?"),
+    ].join("\n");
+  }
+
+  if (/(como funciona|que hacen|que es precali|ustedes que|por que aplicar|filas|papeleo|digital)/.test(text)) {
+    return [
+      "PreCali es el puente digital entre vos y los bancos.",
+      "Perfilamos tu caso, te mostramos opciones y enviamos el expediente al banco elegido.",
+      "La idea es evitar filas y papeleo innecesario.",
+      closingQuestion(choice ? `Queres que iniciemos con ${choice.bank}?` : "Queres iniciar tu precalificacion ahora?"),
+    ].join("\n");
+  }
+
+  return "";
+}
+
 function buildFollowUpReply(profile, results, analysis, body) {
   const text = normalizeTypos(normalizeAmountWords(normalize(body)));
   const best = results[0] || null;
+  const originacionReply = buildOriginacionReply(body, profile, results);
+  if (originacionReply) return originacionReply;
+
+  if (/^(si|sí|ok|dale|de acuerdo|correcto|autorizo|acepto|confirmo|doy permiso)\.?$/.test(text) || /\b(autorizo|acepto|confirmo|doy permiso)\b/.test(text)) {
+    const choice = mentionedResult(results, text) || recommendedOption(results, profile) || best;
+    return [
+      "Perfecto, queda registrada tu autorizacion inicial.",
+      choice ? `Voy a preparar tu perfil para ${bold(choice.bank)}.` : "Voy a preparar tu perfil con la opcion mas sana.",
+      "Para dejarlo listo, necesito confirmar los datos finales del expediente.",
+      closingQuestion(profile.product === "vehiculo" ? "Me pasas valor, ano y modelo del carro?" : "Me pasas valor de la propiedad y ubicacion?"),
+    ].join("\n");
+  }
 
   if (/(hard pull|consulta dura|revision dura|bur[oó]|buro)/.test(text) && !/(soft pull|consulta suave)/.test(text)) {
     return [
@@ -739,7 +795,7 @@ function buildFollowUpReply(profile, results, analysis, body) {
         ? `${bold(choice.bank)} se ve mas sano porque deja una cuota cerca de ${bold(burden + "%")} de tu ingreso neto.`
         : "Prefiero la opcion que mejor cuide tu cuota mensual.",
       "Eso normalmente pesa mas que ahorrar unas decimas en la tasa si el presupuesto queda apretado.",
-      closingQuestion("Queres que te ordene las opciones por cuota mas comoda en vez de tasa?"),
+      closingQuestion(choice ? `Queres iniciar la aplicacion digital con ${choice.bank}?` : "Queres iniciar la aplicacion digital con la opcion mas sana?"),
     ].join("\n");
   }
 
@@ -762,7 +818,7 @@ function buildFollowUpReply(profile, results, analysis, body) {
     }
 
     lines.push("Esto sigue siendo precalificacion, no aprobacion final.");
-    lines.push(closingQuestion(choice ? `Queres que te envie el consentimiento para ${choice.bank}?` : "Queres que te envie el consentimiento para iniciar?"));
+    lines.push(closingQuestion(choice ? `Nos autorizas iniciar el estudio crediticio y preparar tu aplicacion para ${choice.bank}?` : "Nos autorizas iniciar el estudio crediticio y preparar tu aplicacion?"));
     return lines.join("\n");
   }
 
@@ -770,10 +826,10 @@ function buildFollowUpReply(profile, results, analysis, body) {
     const choice = mentionedResult(results, text) || recommendedOption(results, profile) || best;
     return [
       choice ? `Perfecto. Seguimos con ${bold(choice.bank)}.` : "Perfecto. Seguimos con la opcion mas sana.",
-      "El siguiente paso es tu consentimiento digital.",
-      "Con eso validamos tu perfil real con el banco.",
-      "Puede incluir revision suave o formal segun el proceso.",
-      closingQuestion(choice ? `Te envio el consentimiento para ${choice.bank}?` : "Te envio el consentimiento para iniciar?"),
+      `Primero necesitamos tu autorizacion para el ${bold("estudio crediticio inicial")}.`,
+      "Con eso perfilamos tu caso y preparamos el expediente digital.",
+      "La revision formal del banco se autoriza aparte antes de enviarlo.",
+      closingQuestion("Nos das esa autorizacion para avanzar?"),
     ].join("\n");
   }
 
@@ -1139,7 +1195,7 @@ function formatResultsCompact(profile, results, analysis) {
     lines.push("Si me decis el valor del " + assetLabel(profile.product) + ", afino la cuota real.");
   }
   if (applyOptions.length) {
-    lines.push(`Si queres avanzar, responde ${bold(applyOptions.join(" / "))}.`);
+    lines.push(`Para enviar tu precalificacion digital al banco, responde ${bold(applyOptions.join(" / "))}.`);
   }
   buildProfileAdvice(profile, analysis || {}, results).forEach((line) => lines.push(line));
   lines.push(closingQuestion(defaultNextQuestion(analysis || {})));
@@ -1192,7 +1248,8 @@ function buildReply(input) {
     return {
       message: [
         "Hola, soy " + bold("PreCali IA") + ", tu precalificador de confianza.",
-        "Estoy listo para ayudarte a solicitar el mejor credito para ti.",
+        "Soy tu puente digital con bancos en Mexico y Centroamerica.",
+        "Te ayudo a comparar, perfilarte y aplicar sin filas ni papeleo fisico.",
         "Dame ingresos, deudas, si es casa o carro, y la prima que puedes aportar.",
         "Uso tu moneda local por defecto. Si quieres cotizar en dolares, dimelo.",
         "Tambien puedes enviar orden patronal, boleta de pago o estado de cuenta.",
@@ -1203,6 +1260,10 @@ function buildReply(input) {
 
   const profile = parseProfile(body, { defaultCountry, defaultCurrency });
   const analysis = detectApplicantContext(body, profile);
+  const originacionReply = buildOriginacionReply(body, profile, []);
+  if (originacionReply) {
+    return { message: originacionReply };
+  }
 
   if (!profile.income && likelyDocumentFollowUp(body)) {
     return { message: documentFollowUpMessage(profile) };
@@ -1223,10 +1284,10 @@ function buildReply(input) {
     return {
       message: [
         bank ? `Perfecto. Seguimos con ${bold(bank)}.` : "Perfecto. Ya casi aplicamos.",
-        "El siguiente paso pide tu consentimiento digital.",
-        "Con eso validamos tu perfil real con el banco.",
-        "Puede incluir revisión suave o formal.",
-        closingQuestion(bank ? `¿Te envío el consentimiento para ${bank}?` : "¿Con cuál banco querés aplicar?"),
+        `Primero necesitamos tu autorizacion para el ${bold("estudio crediticio inicial")}.`,
+        "Con eso perfilamos tu caso y preparamos el expediente digital.",
+        "La revision formal del banco se autoriza aparte antes de enviarlo.",
+        closingQuestion("Nos das esa autorizacion para avanzar?"),
       ].join("\n"),
     };
   }

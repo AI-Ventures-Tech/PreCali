@@ -356,6 +356,7 @@ function shouldUseRememberedProfile(input, rememberedProfile) {
   if (bodyHasDebtClearedHint(body)) return true;
   if (explicitProductFromBody(body)) return true;
   if (bodyHasYearHint(body)) return true;
+  if (/\b(autorizo|acepto|confirmo|doy permiso)\b|^(si|sí|ok|dale|de acuerdo|correcto)\.?$/.test(normalized)) return true;
   return hasFollowUpCue || hasValidationQuestion || /\b(con|para|prima|monto|valor|plazo|anos|ano|carro|casa|vehiculo|hipoteca|deuda|deudas|cuota)\b/.test(normalized);
 }
 
