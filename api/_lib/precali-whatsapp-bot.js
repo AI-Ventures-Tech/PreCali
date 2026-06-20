@@ -1427,4 +1427,6 @@ module.exports = {
   coerceProfile,
   parseProfile,
   simulate,
+  toInternalAmount,
+  currencyConfig,
 };
