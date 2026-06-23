@@ -15,14 +15,22 @@ function quickReplySid() {
 }
 
 function templatesConfigured() {
-  return Boolean(listProductoSid() && quickReplySid());
+  return Boolean(quickReplySid());
 }
 
-// Arma un envio de lista (solo se usa para elegir tipo de credito).
+// Compatibilidad: el inicio ahora usa quick reply, no list-picker.
 function buildListaProducto() {
   return {
-    contentSid: listProductoSid(),
-    contentVariables: {},
+    contentSid: quickReplySid() || listProductoSid(),
+    contentVariables: {
+      1: "Hola! Soy *PreCali AI*, tu asesor de credito. Que queres simular hoy?",
+      2: "personal",
+      3: "Personal",
+      4: "vehiculo",
+      5: "Vehiculo",
+      6: "hipoteca",
+      7: "Vivienda",
+    },
   };
 }
 

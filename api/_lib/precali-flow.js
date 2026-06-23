@@ -13,7 +13,6 @@ const { resolverDuda } = require("./precali-agent");
 // entrante, y devuelve { actions, session }.
 // actions es un arreglo de:
 //   { kind: "text", body }
-//   { kind: "list" }                          (la lista de producto)
 //   { kind: "buttons", body, options }        (menu de 3 botones)
 
 const DEFAULT_CURRENCY = { CR: "CRC", MX: "MXN", GT: "GTQ", PA: "USD", HN: "HNL", NI: "NIO", SV: "USD" };
@@ -133,7 +132,14 @@ async function manejarDuda({ session, userText }) {
 // ---------- Construcción de acciones reutilizables ----------
 
 function actionListaProducto() {
-  return { kind: "list" };
+  return actionBotones(
+    "Hola! Soy *PreCali AI*, tu asesor de credito. Que queres simular hoy?",
+    [
+      { id: "personal", title: "Personal" },
+      { id: "vehiculo", title: "Vehiculo" },
+      { id: "hipoteca", title: "Vivienda" },
+    ]
+  );
 }
 
 function actionBotones(body, options) {
