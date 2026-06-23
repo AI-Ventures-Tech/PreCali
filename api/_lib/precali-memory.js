@@ -86,6 +86,10 @@ function defaultSession() {
     },
     lastResults: null,
     targetBank: null,
+    lead: { fullName: "", idNumber: "", email: "", incomeSource: "", phoneOverride: "" },
+    documentText: "",
+    extractedSummary: "",
+    correctionNote: "",
     aiHistory: [],
     updatedAt: Date.now(),
   };
