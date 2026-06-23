@@ -3,6 +3,15 @@ const path = require("path");
 const vm = require("vm");
 const { simulate, coerceProfile, toInternalAmount, currencyConfig } = require("./precali-whatsapp-bot");
 
+// ============================================================
+// PreCali AI — Tools (funciones que la IA puede invocar)
+// ============================================================
+// Este modulo NO genera texto ni conversa. Solo hace matematica
+// y consultas exactas contra data.js. La conversacion, las
+// preguntas de seguimiento y las recomendaciones las maneja
+// precali-agent.js (el modelo de lenguaje), que llama estas
+// funciones cuando necesita numeros o requisitos reales.
+
 const COUNTRY_NAMES = {
   CR: "Costa Rica",
   MX: "Mexico",
@@ -39,6 +48,8 @@ function normalizeText(value) {
     .trim();
 }
 
+// ---------- calcular_precalificacion ----------
+
 function recommendedResult(results, profile) {
   if (!results.length) return null;
   const netIncome = Math.max(1, profile.income - profile.debt);
@@ -55,18 +66,12 @@ function buildWarnings(profile, results) {
   const netIncome = profile.income - profile.debt;
 
   if (profile.income <= 0) {
-    warnings.push({
-      tipo: "sin_ingreso",
-      detalle: "Todavia no se conoce el ingreso mensual neto; no se puede calcular nada real sin ese dato.",
-    });
+    warnings.push({ tipo: "sin_ingreso", detalle: "Todavia no se conoce el ingreso mensual neto; no se puede calcular nada real sin ese dato." });
     return warnings;
   }
 
   if (netIncome <= 0) {
-    warnings.push({
-      tipo: "ingreso_neto_cero_o_negativo",
-      detalle: "Las deudas mensuales actuales igualan o superan el ingreso reportado; no queda capacidad de pago.",
-    });
+    warnings.push({ tipo: "ingreso_neto_cero_o_negativo", detalle: "Las deudas mensuales actuales igualan o superan el ingreso reportado; no queda capacidad de pago." });
   }
 
   if (profile.product !== "personal" && profile.assetValue > 0 && profile.downPayment > 0) {
@@ -91,12 +96,17 @@ function buildWarnings(profile, results) {
 
 function calcularPrecalificacion(rawArgs) {
   const args = rawArgs || {};
+  // Primero saneamos pais/moneda/producto/plazo (sin escalar montos todavia).
   const base = coerceProfile({
     country: args.country,
     currency: args.currency,
     product: args.product,
     requestedYears: args.requestedYears,
   });
+
+  // Los montos que manda la IA vienen en la moneda "visible" (lo que dijo el
+  // usuario). Hay que pasarlos a unidades internas antes de simular, y
+  // despues devolver los resultados otra vez en la moneda visible.
   const scale = currencyConfig(base.country, base.currency).scale;
   const toDisplay = (internalValue) => Math.max(0, Math.round((Number(internalValue) || 0) / scale));
 
@@ -110,17 +120,15 @@ function calcularPrecalificacion(rawArgs) {
 
   const results = simulate(profile);
   const incomeDisplay = toDisplay(profile.income);
-  const formatAmount = (displayValue) => `${profile.currency} ${Math.max(0, Math.round(Number(displayValue) || 0)).toLocaleString("es-CR")}`;
-  const opciones = results.slice(0, 3).map((r) => ({
+  const opciones = results.slice(0, 6).map((r) => ({
     banco: r.bank,
     tasa_anual_pct: Number(r.rate.toFixed(2)),
     plazo_anos: r.years,
     monto_maximo: toDisplay(r.amount),
-    monto_maximo_formateado: formatAmount(toDisplay(r.amount)),
     cuota_mensual: toDisplay(r.payment),
-    cuota_mensual_formateada: formatAmount(toDisplay(r.payment)),
     porcentaje_ingreso_a_cuota: incomeDisplay > 0 ? Math.round((toDisplay(r.payment) / incomeDisplay) * 100) : null,
   }));
+
   const recommended = recommendedResult(results, profile);
 
   return {
@@ -139,18 +147,13 @@ function calcularPrecalificacion(rawArgs) {
     recomendacion: recommended
       ? {
           banco: recommended.bank,
-          motivo: "menor carga de cuota sobre el ingreso, dentro de un limite sano",
+          motivo: "menor carga de cuota sobre el ingreso, dentro de un limite sano (cuota <= 35% del ingreso)",
           cuota_mensual: toDisplay(recommended.payment),
-          cuota_mensual_formateada: formatAmount(toDisplay(recommended.payment)),
           tasa_anual_pct: Number(recommended.rate.toFixed(2)),
           monto_maximo: toDisplay(recommended.amount),
-          monto_maximo_formateado: formatAmount(toDisplay(recommended.amount)),
         }
       : null,
-    avisos: buildWarnings(
-      { ...profile, income: incomeDisplay, debt: toDisplay(profile.debt) },
-      results
-    ),
+    avisos: buildWarnings({ ...profile, income: incomeDisplay, debt: toDisplay(profile.debt) }, results),
     calidad_datos:
       profile.country === "CR"
         ? "oficial, revisada en sitios de cada banco"
@@ -163,31 +166,64 @@ const CALCULAR_TOOL_SCHEMA = {
   function: {
     name: "calcular_precalificacion",
     description:
-      "Calcula opciones reales de credito contra bancos de PreCali. Debe llamarse antes de mencionar tasas, montos, cuotas o plazos.",
+      "Calcula opciones REALES de credito contra los bancos de PreCali (tasas, montos, cuotas, recomendacion). " +
+      "SIEMPRE llama esta funcion antes de mencionar cualquier numero de cuota, tasa o monto: nunca los inventes ni los calcules vos mismo. " +
+      "Volve a llamarla cada vez que cambie algun dato del perfil (ingreso, deuda, prima, valor del bien, plazo, producto, pais o moneda).",
     parameters: {
       type: "object",
       properties: {
-        country: { type: "string", enum: ["CR", "MX", "GT", "PA", "HN", "NI", "SV"] },
-        currency: { type: "string", description: "Moneda visible del usuario, ej CRC, USD, MXN, GTQ, HNL, NIO." },
-        product: { type: "string", enum: ["personal", "vehiculo", "hipoteca"] },
-        income: { type: "number", description: "Ingreso mensual neto. 0 si no se sabe." },
-        debt: { type: "number", description: "Deudas mensuales. 0 si no tiene o no se sabe." },
-        downPayment: { type: "number", description: "Prima o enganche disponible. 0 si no se sabe." },
-        assetValue: { type: "number", description: "Valor del carro o propiedad. 0 si no se sabe." },
-        requestedYears: { type: "number", description: "Plazo solicitado o tipico." },
+        country: {
+          type: "string",
+          enum: ["CR", "MX", "GT", "PA", "HN", "NI", "SV"],
+          description: "Pais del usuario.",
+        },
+        currency: {
+          type: "string",
+          description: "Moneda en la que estan expresados los montos de este llamado (ej CRC, USD, MXN, GTQ, HNL, NIO).",
+        },
+        product: {
+          type: "string",
+          enum: ["personal", "vehiculo", "hipoteca"],
+          description: "Tipo de credito que busca la persona.",
+        },
+        income: {
+          type: "number",
+          description: "Ingreso mensual neto del usuario, en la moneda indicada. 0 si todavia no se sabe.",
+        },
+        debt: {
+          type: "number",
+          description: "Deudas mensuales actuales (cuotas que ya paga). 0 si no tiene o no se sabe.",
+        },
+        downPayment: {
+          type: "number",
+          description: "Prima o enganche disponible. 0 si no aplica o no se sabe todavia.",
+        },
+        assetValue: {
+          type: "number",
+          description: "Valor estimado del carro o de la propiedad, si se conoce. 0 si no se sabe.",
+        },
+        requestedYears: {
+          type: "number",
+          description: "Plazo en anos que pide el usuario. Si no lo dijo, usa un valor tipico: 5 personal, 6 vehiculo, 25 hipoteca.",
+        },
       },
       required: ["country", "currency", "product", "income"],
     },
   },
 };
 
+// ---------- consultar_requisitos ----------
+
 function consultarRequisitos(rawArgs) {
   const args = rawArgs || {};
   const country = String(args.pais || "CR").toUpperCase();
   const producto = ["personal", "vehiculo", "hipoteca"].includes(args.producto) ? args.producto : "personal";
   const query = normalizeText(args.banco);
+
   const bancos = loadBancosRaw().filter((b) => String(b.pais || "cr").toUpperCase() === country);
-  if (!bancos.length) return { encontrado: false, mensaje: `PreCali todavia no tiene bancos cargados para ${country}.` };
+  if (!bancos.length) {
+    return { encontrado: false, mensaje: `PreCali todavia no tiene bancos cargados para ${country}.` };
+  }
 
   const match =
     bancos.find((b) => {
@@ -222,11 +258,13 @@ const REQUISITOS_TOOL_SCHEMA = {
   type: "function",
   function: {
     name: "consultar_requisitos",
-    description: "Consulta requisitos reales de un banco especifico de PreCali para un producto.",
+    description:
+      "Consulta los requisitos y documentos OFICIALES reales que pide un banco especifico de PreCali para un producto. " +
+      "Usala cuando el usuario pregunte por documentos, requisitos, papeleo o garantia de un banco concreto. Nunca inventes requisitos.",
     parameters: {
       type: "object",
       properties: {
-        banco: { type: "string" },
+        banco: { type: "string", description: "Nombre del banco mencionado por el usuario, ej 'BAC', 'Banco Nacional', 'BBVA'." },
         producto: { type: "string", enum: ["personal", "vehiculo", "hipoteca"] },
         pais: { type: "string", enum: ["CR", "MX", "GT", "PA", "HN", "NI", "SV"] },
       },
