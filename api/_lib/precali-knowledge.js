@@ -4,13 +4,6 @@ const vm = require("vm");
 
 const COUNTRY_NAMES = {
   CR: "Costa Rica",
-  MX: "Mexico",
-  GT: "Guatemala",
-  PA: "Panama",
-  HN: "Honduras",
-  NI: "Nicaragua",
-  SV: "El Salvador",
-  US: "Estados Unidos",
 };
 
 const PRODUCT_LABELS = {
@@ -20,7 +13,7 @@ const PRODUCT_LABELS = {
 };
 
 function normalizeCountry(country) {
-  return String(country || "CR").toUpperCase();
+  return "CR";
 }
 
 function readRootFile(filename) {
@@ -73,7 +66,7 @@ function siteKnowledgeLines() {
   const terms = readRootFile("terminos.html");
   const privacy = readRootFile("privacidad.html");
   const lines = [
-    "PreCali compara opciones de bancos y aseguradoras por region para mostrar tasas, requisitos y proximos pasos con claridad.",
+    "PreCali compara opciones de bancos y aseguradoras de Costa Rica para mostrar tasas, requisitos y proximos pasos con claridad.",
     "La calculadora procesa la situacion financiera y usa sistema frances de amortizacion.",
     "Cada banco define capacidad de pago, tasa, plazo maximo y porcentaje de financiamiento.",
     "PreCali no es banco, no otorga prestamos y las precalificaciones son estimaciones referenciales no vinculantes.",

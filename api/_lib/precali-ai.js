@@ -81,7 +81,7 @@ function normalizeProduct(value) {
 
 function normalizeCurrency(value) {
   const currency = String(value || "").toUpperCase();
-  if (["CRC", "USD", "MXN", "GTQ", "HNL", "NIO"].includes(currency)) return currency;
+  if (["CRC", "USD"].includes(currency)) return currency;
   return null;
 }
 
@@ -135,7 +135,7 @@ function buildSchema() {
             anyOf: [{ type: "string", enum: ["personal", "vehiculo", "hipoteca"] }, { type: "null" }],
           },
           currency: {
-            anyOf: [{ type: "string", enum: ["CRC", "USD", "MXN", "GTQ", "HNL", "NIO"] }, { type: "null" }],
+            anyOf: [{ type: "string", enum: ["CRC", "USD"] }, { type: "null" }],
           },
           income: nullableNumber,
           debt: nullableNumber,
@@ -169,13 +169,13 @@ function buildSchema() {
 
 function buildExtractionPrompt(body, mediaType) {
   return [
-    "Sos el extractor de datos de PreCali para pre-calificacion financiera en Latinoamerica.",
+    "Sos el extractor de datos de PreCali para pre-calificacion financiera en Costa Rica.",
     "Extrae solamente datos que aparezcan en el mensaje o documento. No inventes montos.",
     "Puede venir texto desordenado, con faltas de ortografia, orden patronal, boleta de pago, colilla, estado de cuenta, proforma, foto o PDF.",
     "Usa salario/ingreso NETO si existe. Si solo existe salario bruto, ponlo en grossIncome y usa income solo si el documento indica neto o liquido.",
     "No trates rebajos legales de planilla como deudas mensuales, excepto si aparecen como prestamos, cuotas, embargos, pension u obligaciones recurrentes.",
     "Producto: hipoteca para casa/vivienda/lote/terreno/propiedad; vehiculo para carro/auto/moto; personal para prestamo personal o si no hay garantia.",
-    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses, USD para dolares, MXN, GTQ, HNL o NIO segun corresponda.",
+    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses o USD para dolares.",
     "Devuelve numeros puros en la moneda detectada del mensaje. No uses simbolos ni separadores.",
     "Si hay documento adjunto, clasificalo y extrae nombre, cedula, patrono, ingreso bruto y neto cuando se pueda.",
     "",
@@ -193,12 +193,12 @@ function buildGroqExtractionPrompt(body, recentMessages) {
     : "(sin contexto previo)";
 
   return [
-    "Sos el extractor conversacional de PreCali para pre-calificacion financiera en Latinoamerica.",
+    "Sos el extractor conversacional de PreCali para pre-calificacion financiera en Costa Rica.",
     "Entende texto desordenado de WhatsApp y devolve SOLO JSON valido.",
     "No inventes montos. Si no sabes algo, usa null o array vacio.",
     "Usa producto: personal, vehiculo o hipoteca.",
     "Si el usuario hace una pregunta de seguimiento, usa el contexto reciente para inferir a que se refiere.",
-    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses, USD para dolares, MXN, GTQ, HNL o NIO segun corresponda.",
+    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses o USD para dolares.",
     "Devuelve numeros puros en la moneda detectada del mensaje. No uses simbolos ni separadores.",
     "",
     "Contexto reciente del chat:",
@@ -224,7 +224,7 @@ function buildGroqDocumentPrompt(body, recentMessages, documentText) {
     "Usa ingreso neto/liquido si aparece. Si solo hay bruto, colocalo como grossIncome y usa income solo si no hay neto.",
     "No trates deducciones de ley como deuda. Solo usa deuda si dice prestamo, tarjeta, embargo, pension, cuota u obligacion recurrente.",
     "Producto: hipoteca para casa/vivienda/lote/terreno/propiedad; vehiculo para carro/auto/moto; personal si no hay garantia.",
-    "Detecta la moneda si aparece en el mensaje o documento. Usa CRC, USD, MXN, GTQ, HNL o NIO. Si no aparece, usa null.",
+    "Detecta la moneda si aparece en el mensaje o documento. Usa CRC o USD. Si no aparece, usa null.",
     "",
     "Contexto reciente del chat:",
     historyLines,
@@ -241,13 +241,6 @@ function buildGroqDocumentPrompt(body, recentMessages, documentText) {
 
 const ADVISOR_COUNTRY_CONFIG = {
   CR: { defaultCurrency: "CRC", currencies: { CRC: { scale: 1 }, USD: { scale: 540 } } },
-  MX: { defaultCurrency: "MXN", currencies: { MXN: { scale: 29 }, USD: { scale: 540 } } },
-  GT: { defaultCurrency: "GTQ", currencies: { GTQ: { scale: 68 }, USD: { scale: 540 } } },
-  PA: { defaultCurrency: "USD", currencies: { USD: { scale: 540 } } },
-  HN: { defaultCurrency: "HNL", currencies: { HNL: { scale: 22 }, USD: { scale: 540 } } },
-  NI: { defaultCurrency: "NIO", currencies: { NIO: { scale: 15 }, USD: { scale: 540 } } },
-  SV: { defaultCurrency: "USD", currencies: { USD: { scale: 540 } } },
-  US: { defaultCurrency: "USD", currencies: { USD: { scale: 540 } } },
 };
 
 function advisorCurrency(profile) {
@@ -484,10 +477,10 @@ function buildGroqAdvisorPrompt(input) {
     : "(ninguno detectado)";
 
   return [
-    "Sos PreCali AI, asesor crediticio experto, empatico y altamente comercial para Mexico y Centroamerica.",
+    "Sos PreCali AI, asesor crediticio experto, empatico y altamente comercial para Costa Rica.",
     "Tu objetivo es conversar como asesor crediticio humano: entender, explicar, calcular cuando haya datos y guiar al usuario a aplicar formalmente al banco elegido por este chat.",
     "Presenta a PreCali como puente digital entre el usuario y los bancos: perfilamos, comparamos y preparamos la aplicacion sin filas ni papeleo fisico.",
-    "Responde como humano: claro, directo, empatico y confiable. Usa vos en Centroamerica y tu en Mexico.",
+    "Responde como humano: claro, directo, empatico y confiable. Usa vos de forma natural y respetuosa.",
     "No hagas cuestionarios roboticos. Pide un dato a la vez, o maximo dos si el usuario ya dio contexto claro.",
     "Usa SOLO el perfil, opciones calculadas y base de conocimiento abajo. No inventes bancos, tasas, aprobaciones, requisitos, alianzas ni procesos.",
     "Si el usuario menciona un banco que aparece en las opciones calculadas, evalua ese banco; no digas que no existe.",

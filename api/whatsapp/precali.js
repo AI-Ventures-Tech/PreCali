@@ -62,14 +62,8 @@ function parseParams(req, rawBody) {
 }
 
 function explicitCountryFromPhone(from) {
-  const phone = String(from || "").replace(/^whatsapp:/i, "").replace(/[^\d+]/g, "");
-  if (phone.startsWith("+506")) return "CR";
-  if (phone.startsWith("+507")) return "PA";
-  if (phone.startsWith("+502")) return "GT";
-  if (phone.startsWith("+504")) return "HN";
-  if (phone.startsWith("+505")) return "NI";
-  if (phone.startsWith("+503")) return "SV";
-  if (phone.startsWith("+521") || phone.startsWith("+52")) return "MX";
+  // MVP: produccion enfocada solo en Costa Rica.
+  // La data regional completa queda respaldada para una expansion futura.
   return "CR";
 }
 
@@ -239,8 +233,8 @@ function buildCommandsText() {
 function buildInstructionsText() {
   return [
     "*Logica de PreCali IA*",
-    "1. Detecta pais por telefono y usa moneda nativa por defecto.",
-    "2. Recoge producto, ingreso neto, deudas y prima.",
+    "1. Mercado activo: Costa Rica.",
+    "2. Usa CRC por defecto; si el usuario dice dolares, usa USD.",
     "3. Capacidad = ingreso x ratio del banco - deudas.",
     "4. Monto maximo = cuota posible con tasa y plazo del banco.",
     "5. Si hay prima o valor del bien, limita por financiamiento maximo.",

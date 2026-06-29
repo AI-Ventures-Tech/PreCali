@@ -14,12 +14,6 @@ const { simulate, coerceProfile, toInternalAmount, currencyConfig } = require(".
 
 const COUNTRY_NAMES = {
   CR: "Costa Rica",
-  MX: "Mexico",
-  GT: "Guatemala",
-  PA: "Panama",
-  HN: "Honduras",
-  NI: "Nicaragua",
-  SV: "El Salvador",
 };
 
 const PRODUCT_LABELS = {
@@ -155,9 +149,7 @@ function calcularPrecalificacion(rawArgs) {
       : null,
     avisos: buildWarnings({ ...profile, income: incomeDisplay, debt: toDisplay(profile.debt) }, results),
     calidad_datos:
-      profile.country === "CR"
-        ? "oficial, revisada en sitios de cada banco"
-        : "referencial: PreCali todavia esta validando estas tasas con cada banco en este pais",
+      "oficial, revisada en sitios de cada banco",
   };
 }
 
@@ -174,12 +166,13 @@ const CALCULAR_TOOL_SCHEMA = {
       properties: {
         country: {
           type: "string",
-          enum: ["CR", "MX", "GT", "PA", "HN", "NI", "SV"],
-          description: "Pais del usuario.",
+          enum: ["CR"],
+          description: "Pais del usuario. En este MVP solo Costa Rica esta activo.",
         },
         currency: {
           type: "string",
-          description: "Moneda en la que estan expresados los montos de este llamado (ej CRC, USD, MXN, GTQ, HNL, NIO).",
+          enum: ["CRC", "USD"],
+          description: "Moneda en la que estan expresados los montos de este llamado. En Costa Rica se admite CRC o USD.",
         },
         product: {
           type: "string",
@@ -216,7 +209,7 @@ const CALCULAR_TOOL_SCHEMA = {
 
 function consultarRequisitos(rawArgs) {
   const args = rawArgs || {};
-  const country = String(args.pais || "CR").toUpperCase();
+  const country = "CR";
   const producto = ["personal", "vehiculo", "hipoteca"].includes(args.producto) ? args.producto : "personal";
   const query = normalizeText(args.banco);
 
@@ -266,7 +259,7 @@ const REQUISITOS_TOOL_SCHEMA = {
       properties: {
         banco: { type: "string", description: "Nombre del banco mencionado por el usuario, ej 'BAC', 'Banco Nacional', 'BBVA'." },
         producto: { type: "string", enum: ["personal", "vehiculo", "hipoteca"] },
-        pais: { type: "string", enum: ["CR", "MX", "GT", "PA", "HN", "NI", "SV"] },
+        pais: { type: "string", enum: ["CR"] },
       },
       required: ["banco", "producto", "pais"],
     },

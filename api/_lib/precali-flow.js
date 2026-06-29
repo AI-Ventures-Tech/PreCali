@@ -1,15 +1,9 @@
 const { calcularPrecalificacion, consultarRequisitos } = require("./precali-tools");
 const { resolverDuda } = require("./precali-agent");
 
-const DEFAULT_CURRENCY = { CR: "CRC", MX: "MXN", GT: "GTQ", PA: "USD", HN: "HNL", NI: "NIO", SV: "USD" };
+const DEFAULT_CURRENCY = { CR: "CRC" };
 const COUNTRY_CURRENCIES = {
   CR: ["CRC", "USD"],
-  MX: ["MXN", "USD"],
-  GT: ["GTQ", "USD"],
-  PA: ["USD"],
-  HN: ["HNL", "USD"],
-  NI: ["NIO", "USD"],
-  SV: ["USD"],
 };
 const PRODUCT_LABEL = { personal: "credito personal", vehiculo: "credito vehicular", hipoteca: "credito de vivienda" };
 const PRODUCT_ASSET_WORD = { vehiculo: "vehiculo", hipoteca: "propiedad" };
@@ -86,26 +80,17 @@ function hasNoDebtSignal(text) {
 function detectCurrencyFromText(text, country) {
   const raw = String(text || "").toLowerCase();
   const t = normalize(text);
-  const countryCode = String(country || "CR").toUpperCase();
 
   if (/\busd\b|dolares?|dollars?|verdes?|americanos?/.test(t)) return "USD";
   if (/\bcrc\b|colones?|colon costarricense|costarricenses|₡/.test(t)) return "CRC";
-  if (/\bmxn\b|pesos mexicanos?|peso mexicano/.test(t)) return "MXN";
-  if (/\bgtq\b|quetzales?/.test(t)) return "GTQ";
-  if (/\bhnl\b|lempiras?/.test(t)) return "HNL";
-  if (/\bnio\b|cordobas?/.test(t)) return "NIO";
-
-  if (raw.includes("$")) {
-    if (countryCode === "MX") return "MXN";
-    return "USD";
-  }
+  if (raw.includes("$")) return "USD";
 
   return "";
 }
 
 function allowedCurrency(currency, country) {
   const normalized = String(currency || "").toUpperCase();
-  const allowed = COUNTRY_CURRENCIES[String(country || "CR").toUpperCase()] || ["CRC", "USD"];
+  const allowed = COUNTRY_CURRENCIES.CR;
   return allowed.includes(normalized) ? normalized : "";
 }
 
@@ -114,7 +99,7 @@ function labeledAmount(text, labels) {
   const label = labels.join("|");
   const amount = String.raw`\d+(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?`;
   const amountWithSuffix = String.raw`(?:${amount})\s*(?:millon(?:es)?|mill\b|mil\b|k\b|m\b)?`;
-  const currencyWords = String.raw`(?:usd|dolares?|dollars?|crc|colones?|mxn|pesos?|gtq|quetzales?|hnl|lempiras?|nio|cordobas?|verdes?)`;
+  const currencyWords = String.raw`(?:usd|dolares?|dollars?|crc|colones?|verdes?)`;
   const after = new RegExp(String.raw`\b(?:${label})\b[^\d]{0,30}(${amountWithSuffix})`, "i");
   const before = new RegExp(String.raw`(${amountWithSuffix})(?:\s*${currencyWords})?\s*(?:de\s+)?(?:${label})\b`, "i");
   const match = raw.match(after) || raw.match(before);

@@ -1,36 +1,115 @@
 // Datos orientativos de aseguradoras para PreCali Seguros.
+// MVP activo: Costa Rica. Data regional respaldada en backups/data-aseguradoras-regional-2026-06-29.js.
 // No son tarifas vinculantes: se usan para estimar rangos y dirigir al cotizador oficial.
 const ASEGURADORAS = [
-  {id:'gnp_mx',pais:'mx',nombre:'GNP Seguros',iniciales:'GNP',color:'#f36f21',tipo:'Privada',rating:9.6,web:'https://www.gnp.com.mx/seguros/auto',productos:{auto:{factor:1.08,cotizador:'https://www.gnp.com.mx/seguros/auto',nota:'Fuerte en auto y gastos médicos.'},vida:{factor:1.05,cotizador:'https://www.gnp.com.mx/seguros/vida'},salud:{factor:1.08,cotizador:'https://www.gnp.com.mx/seguros/gastos-medicos'}}},
-  {id:'qualitas_mx',pais:'mx',nombre:'Quálitas',iniciales:'QLT',color:'#0060a8',tipo:'Privada',rating:7.8,web:'https://www.qualitas.com.mx/cotizar',productos:{auto:{factor:.92,cotizador:'https://www.qualitas.com.mx/cotizar',nota:'Especialista en autos, usualmente competitiva en precio.'}}},
-  {id:'axa_mx',pais:'mx',nombre:'AXA México',iniciales:'AXA',color:'#0b4ea2',tipo:'Privada',rating:8.3,web:'https://clientes.axa.com.mx/cotiza-axa/',productos:{auto:{factor:1.04,cotizador:'https://clientes.axa.com.mx/cotiza-axa/'},vida:{factor:1.08,cotizador:'https://www.axa.com.mx/personas/vida'},salud:{factor:1.12,cotizador:'https://www.axa.com.mx/personas/gastos-medicos'}}},
-  {id:'mapfre_mx',pais:'mx',nombre:'MAPFRE México',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8,web:'https://motor.mapfre.com.mx/',productos:{auto:{factor:.98,cotizador:'https://motor.mapfre.com.mx/'},vida:{factor:1.02,cotizador:'https://www.mapfre.com.mx/seguros-mx/personas/seguro-de-vida/'},salud:{factor:1,cotizador:'https://www.mapfre.com.mx/seguros-mx/personas/seguro-de-salud/'}}},
-  {id:'hdi_mx',pais:'mx',nombre:'HDI Seguros',iniciales:'HDI',color:'#6bbd45',tipo:'Privada',rating:9.3,web:'https://www.hdi.com.mx/cotizar/',productos:{auto:{factor:.96,cotizador:'https://www.hdi.com.mx/cotizar/',nota:'Buen balance precio-servicio en auto.'}}},
-  {id:'metlife_mx',pais:'mx',nombre:'MetLife México',iniciales:'MET',color:'#007abc',tipo:'Privada',rating:8.6,web:'https://www.metlife.com.mx/personas/',productos:{vida:{factor:1.02,cotizador:'https://www.metlife.com.mx/personas/'}}},
-  {id:'roble_gt',pais:'gt',nombre:'Seguros El Roble',iniciales:'ROB',color:'#006b3f',tipo:'Privada',rating:8.8,web:'https://www.elroble.com.gt',productos:{auto:{factor:1,cotizador:'https://www.elroble.com.gt'},vida:{factor:1,cotizador:'https://www.elroble.com.gt'},salud:{factor:1.02,cotizador:'https://www.elroble.com.gt'}}},
-  {id:'gt_gt',pais:'gt',nombre:'Seguros G&T',iniciales:'G&T',color:'#003b71',tipo:'Privada',rating:8.4,web:'https://www.aseguradoragt.com/',productos:{auto:{factor:1.01,cotizador:'https://www.aseguradoragt.com/'},vida:{factor:1.04,cotizador:'https://www.aseguradoragt.com/'},salud:{factor:1.05,cotizador:'https://www.aseguradoragt.com/'}}},
-  {id:'mapfre_gt',pais:'gt',nombre:'MAPFRE Guatemala',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8.3,web:'https://www.mapfre.com.gt/cotizador/',productos:{auto:{factor:.96,cotizador:'https://www.mapfre.com.gt/cotizador/'},vida:{factor:1,cotizador:'https://www.mapfre.com.gt/'},salud:{factor:1.02,cotizador:'https://www.mapfre.com.gt/'}}},
-  {id:'palig_gt',pais:'gt',nombre:'Pan American Life',iniciales:'PAL',color:'#00539f',tipo:'Privada',rating:8.7,web:'https://www.palig.com/es/countries/guatemala',productos:{vida:{factor:.98,cotizador:'https://www.palig.com/es/countries/guatemala'},salud:{factor:.99,cotizador:'https://www.palig.com/es/countries/guatemala'}}},
-  {id:'sisa_sv',pais:'sv',nombre:'SISA',iniciales:'SIS',color:'#004b8d',tipo:'Privada',rating:8.7,web:'https://www.sisaseguros.com/cotizar',productos:{auto:{factor:1.02,cotizador:'https://www.sisaseguros.com/cotizar'},vida:{factor:1,cotizador:'https://www.sisaseguros.com/'},salud:{factor:1.03,cotizador:'https://www.sisaseguros.com/'}}},
-  {id:'asesuisa_sv',pais:'sv',nombre:'Asesuisa',iniciales:'ASE',color:'#e31e24',tipo:'Privada',rating:8.5,web:'https://www.asesuisa.com/cotizar/',productos:{auto:{factor:.98,cotizador:'https://www.asesuisa.com/cotizar/',nota:'Fuerte históricamente en autos.'},vida:{factor:1.02,cotizador:'https://www.asesuisa.com/'},salud:{factor:1.02,cotizador:'https://www.asesuisa.com/'}}},
-  {id:'mapfre_sv',pais:'sv',nombre:'MAPFRE El Salvador',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8.2,web:'https://www.mapfre.com.sv/cotizador/',productos:{auto:{factor:.97,cotizador:'https://www.mapfre.com.sv/cotizador/'},vida:{factor:1,cotizador:'https://www.mapfre.com.sv/'},salud:{factor:1.02,cotizador:'https://www.mapfre.com.sv/'}}},
-  {id:'palig_sv',pais:'sv',nombre:'Pan American Life',iniciales:'PAL',color:'#00539f',tipo:'Privada',rating:8.6,web:'https://www.palig.com/es/countries/el-salvador',productos:{vida:{factor:.98,cotizador:'https://www.palig.com/es/countries/el-salvador'},salud:{factor:.99,cotizador:'https://www.palig.com/es/countries/el-salvador'}}},
-  {id:'ficohsa_hn',pais:'hn',nombre:'FICOHSA Seguros',iniciales:'FIC',color:'#b08d2f',tipo:'Privada',rating:8.6,web:'https://www.ficohsa.hn/banca-personas/seguros',productos:{auto:{factor:1.03,cotizador:'https://www.ficohsa.hn/banca-personas/seguros'},vida:{factor:1,cotizador:'https://www.ficohsa.hn/banca-personas/seguros'},salud:{factor:1.04,cotizador:'https://www.ficohsa.hn/banca-personas/seguros'}}},
-  {id:'mapfre_hn',pais:'hn',nombre:'MAPFRE Honduras',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8.2,web:'https://www.mapfre.com.hn/cotizador/',productos:{auto:{factor:.96,cotizador:'https://www.mapfre.com.hn/cotizador/'},vida:{factor:1,cotizador:'https://www.mapfre.com.hn/'},salud:{factor:1.02,cotizador:'https://www.mapfre.com.hn/'}}},
-  {id:'palig_hn',pais:'hn',nombre:'Pan American Life',iniciales:'PAL',color:'#00539f',tipo:'Privada',rating:8.7,web:'https://www.palig.com/es/countries/honduras',productos:{vida:{factor:.98,cotizador:'https://www.palig.com/es/countries/honduras'},salud:{factor:.99,cotizador:'https://www.palig.com/es/countries/honduras'}}},
-  {id:'atlantida_hn',pais:'hn',nombre:'Seguros Atlántida',iniciales:'ATL',color:'#005baa',tipo:'Privada',rating:8.1,web:'https://www.bancatlan.hn/seguros',productos:{auto:{factor:1,cotizador:'https://www.bancatlan.hn/seguros'},vida:{factor:1.02,cotizador:'https://www.bancatlan.hn/seguros'}}},
-  {id:'lafise_ni',pais:'ni',nombre:'LAFISE Seguros',iniciales:'LAF',color:'#006b3f',tipo:'Privada',rating:8.4,web:'https://www.lafise.com/bln/personas/seguros',productos:{auto:{factor:1,cotizador:'https://www.lafise.com/bln/personas/seguros'},vida:{factor:1,cotizador:'https://www.lafise.com/bln/personas/seguros'},salud:{factor:1.02,cotizador:'https://www.lafise.com/bln/personas/seguros'}}},
-  {id:'iniser_ni',pais:'ni',nombre:'INISER',iniciales:'INI',color:'#1b75bb',tipo:'Estatal',rating:7.9,web:'https://www.iniser.com.ni/',productos:{auto:{factor:.92,cotizador:'https://www.iniser.com.ni/',nota:'Frecuentemente más competitivo por ser estatal.'},vida:{factor:.98,cotizador:'https://www.iniser.com.ni/'}}},
-  {id:'america_ni',pais:'ni',nombre:'Seguros América',iniciales:'AME',color:'#e21b2d',tipo:'Privada',rating:8.1,web:'https://www.segurosamerica.com.ni/',productos:{auto:{factor:.98,cotizador:'https://www.segurosamerica.com.ni/'},vida:{factor:1,cotizador:'https://www.segurosamerica.com.ni/'},salud:{factor:1.02,cotizador:'https://www.segurosamerica.com.ni/'}}},
-  {id:'mapfre_ni',pais:'ni',nombre:'MAPFRE Nicaragua',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8,web:'https://www.mapfre.com.ni/cotizador/',productos:{auto:{factor:1,cotizador:'https://www.mapfre.com.ni/cotizador/'},vida:{factor:1.03,cotizador:'https://www.mapfre.com.ni/'}}},
-  {id:'ins_cr',pais:'cr',nombre:'INS',iniciales:'INS',color:'#005baa',tipo:'Estatal',rating:8.8,web:'https://asegurate.grupoins.com/frmEstimacionVehVol.aspx',productos:{auto:{factor:1,cotizador:'https://asegurate.grupoins.com/frmEstimacionVehVol.aspx',nota:'Incluye referencia para voluntario; el SOA es obligatorio y separado.'},vida:{factor:1.02,cotizador:'https://www.grupoins.com/'},salud:{factor:1.02,cotizador:'https://www.grupoins.com/'}}},
-  {id:'sura_cr',pais:'cr',nombre:'SURA Costa Rica',iniciales:'SUR',color:'#0033a0',tipo:'Privada',rating:8.5,web:'https://www.segurossura.com.cr/cotizar/',productos:{auto:{factor:1.08,cotizador:'https://www.segurossura.com.cr/cotizar/'},vida:{factor:1.05,cotizador:'https://www.segurossura.com.cr/'},salud:{factor:1.08,cotizador:'https://www.segurossura.com.cr/'}}},
-  {id:'mapfre_cr',pais:'cr',nombre:'MAPFRE Costa Rica',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8.2,web:'https://www.mapfre.cr/cotizador/',productos:{auto:{factor:1.03,cotizador:'https://www.mapfre.cr/cotizador/'},vida:{factor:1,cotizador:'https://www.mapfre.cr/'},salud:{factor:1.02,cotizador:'https://www.mapfre.cr/'}}},
-  {id:'qualitas_cr',pais:'cr',nombre:'Quálitas Costa Rica',iniciales:'QLT',color:'#0060a8',tipo:'Privada',rating:8.1,web:'https://www.qualitas.cr/',productos:{auto:{factor:.92,cotizador:'https://www.qualitas.cr/',nota:'Especialista en autos.'}}},
-  {id:'palig_cr',pais:'cr',nombre:'Pan American Life',iniciales:'PAL',color:'#00539f',tipo:'Privada',rating:8.7,web:'https://www.palig.com/es/countries/costa-rica',productos:{vida:{factor:.98,cotizador:'https://www.palig.com/es/countries/costa-rica'},salud:{factor:.99,cotizador:'https://www.palig.com/es/countries/costa-rica'}}},
-  {id:'assa_pa',pais:'pa',nombre:'ASSA Panamá',iniciales:'ASSA',color:'#002b5c',tipo:'Privada',rating:8.9,web:'https://www.assaseguros.com/cotizador/',productos:{auto:{factor:1,cotizador:'https://www.assaseguros.com/cotizador/',nota:'Cotizador online avanzado.'},vida:{factor:1.02,cotizador:'https://www.assaseguros.com/vida/'},salud:{factor:1.05,cotizador:'https://www.assaseguros.com/salud/'}}},
-  {id:'sura_pa',pais:'pa',nombre:'SURA Panamá',iniciales:'SUR',color:'#0033a0',tipo:'Privada',rating:8.5,web:'https://www.segurossura.com.pa/cotizar/',productos:{auto:{factor:.94,cotizador:'https://www.segurossura.com.pa/cotizar/',nota:'Alto volumen en autos.'},vida:{factor:1.02,cotizador:'https://www.segurossura.com.pa/'},salud:{factor:1.04,cotizador:'https://www.segurossura.com.pa/'}}},
-  {id:'mapfre_pa',pais:'pa',nombre:'MAPFRE Panamá',iniciales:'MAP',color:'#d71920',tipo:'Privada',rating:8.2,web:'https://www.mapfre.com.pa/cotizador/',productos:{auto:{factor:.96,cotizador:'https://www.mapfre.com.pa/cotizador/'},vida:{factor:1,cotizador:'https://www.mapfre.com.pa/'},salud:{factor:1.02,cotizador:'https://www.mapfre.com.pa/'}}},
-  {id:'palig_pa',pais:'pa',nombre:'Pan American Life',iniciales:'PAL',color:'#00539f',tipo:'Privada',rating:8.8,web:'https://www.palig.com/es/countries/panama',productos:{vida:{factor:.98,cotizador:'https://www.palig.com/es/pa/seguro-de-vida-individual'},salud:{factor:.98,cotizador:'https://www.palig.com/es/pa/seguro-de-salud-individual'}}},
-  {id:'internacional_pa',pais:'pa',nombre:'Internacional de Seguros',iniciales:'IS',color:'#004987',tipo:'Privada',rating:8.4,web:'https://www.internacionaldeseguros.com/',productos:{auto:{factor:.98,cotizador:'https://www.internacionaldeseguros.com/'},vida:{factor:1.02,cotizador:'https://www.internacionaldeseguros.com/'},salud:{factor:1.03,cotizador:'https://www.internacionaldeseguros.com/'}}}
+  {
+    "id": "ins_cr",
+    "pais": "cr",
+    "nombre": "INS",
+    "iniciales": "INS",
+    "color": "#005baa",
+    "tipo": "Estatal",
+    "rating": 8.8,
+    "web": "https://asegurate.grupoins.com/frmEstimacionVehVol.aspx",
+    "productos": {
+      "auto": {
+        "factor": 1,
+        "cotizador": "https://asegurate.grupoins.com/frmEstimacionVehVol.aspx",
+        "nota": "Incluye referencia para voluntario; el SOA es obligatorio y separado."
+      },
+      "vida": {
+        "factor": 1.02,
+        "cotizador": "https://www.grupoins.com/"
+      },
+      "salud": {
+        "factor": 1.02,
+        "cotizador": "https://www.grupoins.com/"
+      }
+    }
+  },
+  {
+    "id": "sura_cr",
+    "pais": "cr",
+    "nombre": "SURA Costa Rica",
+    "iniciales": "SUR",
+    "color": "#0033a0",
+    "tipo": "Privada",
+    "rating": 8.5,
+    "web": "https://www.segurossura.com.cr/cotizar/",
+    "productos": {
+      "auto": {
+        "factor": 1.08,
+        "cotizador": "https://www.segurossura.com.cr/cotizar/"
+      },
+      "vida": {
+        "factor": 1.05,
+        "cotizador": "https://www.segurossura.com.cr/"
+      },
+      "salud": {
+        "factor": 1.08,
+        "cotizador": "https://www.segurossura.com.cr/"
+      }
+    }
+  },
+  {
+    "id": "mapfre_cr",
+    "pais": "cr",
+    "nombre": "MAPFRE Costa Rica",
+    "iniciales": "MAP",
+    "color": "#d71920",
+    "tipo": "Privada",
+    "rating": 8.2,
+    "web": "https://www.mapfre.cr/cotizador/",
+    "productos": {
+      "auto": {
+        "factor": 1.03,
+        "cotizador": "https://www.mapfre.cr/cotizador/"
+      },
+      "vida": {
+        "factor": 1,
+        "cotizador": "https://www.mapfre.cr/"
+      },
+      "salud": {
+        "factor": 1.02,
+        "cotizador": "https://www.mapfre.cr/"
+      }
+    }
+  },
+  {
+    "id": "qualitas_cr",
+    "pais": "cr",
+    "nombre": "Quálitas Costa Rica",
+    "iniciales": "QLT",
+    "color": "#0060a8",
+    "tipo": "Privada",
+    "rating": 8.1,
+    "web": "https://www.qualitas.cr/",
+    "productos": {
+      "auto": {
+        "factor": 0.92,
+        "cotizador": "https://www.qualitas.cr/",
+        "nota": "Especialista en autos."
+      }
+    }
+  },
+  {
+    "id": "palig_cr",
+    "pais": "cr",
+    "nombre": "Pan American Life",
+    "iniciales": "PAL",
+    "color": "#00539f",
+    "tipo": "Privada",
+    "rating": 8.7,
+    "web": "https://www.palig.com/es/countries/costa-rica",
+    "productos": {
+      "vida": {
+        "factor": 0.98,
+        "cotizador": "https://www.palig.com/es/countries/costa-rica"
+      },
+      "salud": {
+        "factor": 0.99,
+        "cotizador": "https://www.palig.com/es/countries/costa-rica"
+      }
+    }
+  }
 ];

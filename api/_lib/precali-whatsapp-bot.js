@@ -21,13 +21,6 @@ function normalizeSourceCountry(country) {
 function sourceCurrencyForCountry(country) {
   const nativeCurrencies = {
     CR: "CRC",
-    MX: "MXN",
-    GT: "GTQ",
-    PA: "USD",
-    HN: "HNL",
-    NI: "NIO",
-    SV: "USD",
-    US: "USD",
   };
   return nativeCurrencies[normalizeSourceCountry(country)] || "CRC";
 }
@@ -84,13 +77,6 @@ function loadBankCatalog() {
 const BANKS = loadBankCatalog();
 const COUNTRY_CONFIG = {
   CR: { name: "Costa Rica", defaultCurrency: "CRC", currencies: { CRC: { locale: "es-CR", scale: 1 }, USD: { locale: "en-US", scale: 540 } } },
-  MX: { name: "Mexico", defaultCurrency: "MXN", currencies: { MXN: { locale: "es-MX", scale: 29 }, USD: { locale: "en-US", scale: 540 } } },
-  GT: { name: "Guatemala", defaultCurrency: "GTQ", currencies: { GTQ: { locale: "es-GT", scale: 68 }, USD: { locale: "en-US", scale: 540 } } },
-  PA: { name: "Panama", defaultCurrency: "USD", currencies: { USD: { locale: "en-US", scale: 540 } } },
-  HN: { name: "Honduras", defaultCurrency: "HNL", currencies: { HNL: { locale: "es-HN", scale: 22 }, USD: { locale: "en-US", scale: 540 } } },
-  NI: { name: "Nicaragua", defaultCurrency: "NIO", currencies: { NIO: { locale: "es-NI", scale: 15 }, USD: { locale: "en-US", scale: 540 } } },
-  SV: { name: "El Salvador", defaultCurrency: "USD", currencies: { USD: { locale: "es-SV", scale: 540 } } },
-  US: { name: "Estados Unidos", defaultCurrency: "USD", currencies: { USD: { locale: "en-US", scale: 540 } } },
 };
 
 const AMOUNT_PATTERN = /([\d.,]+(?:\s*(?:millones|millon|mill|mil|k|m)\b)?(?:\s+[\d.,]+\s*mil\b)?)/;
@@ -165,15 +151,7 @@ function normalizeInputText(body) {
 }
 
 function detectCountry(text, defaultCountry) {
-  if (/\bmexico\b|\bmx\b/.test(text)) return "MX";
-  if (/\bpesos\b|\bmxn\b/.test(text)) return "MX";
-  if (/\bguatemala\b|\bgt\b/.test(text)) return "GT";
-  if (/\bquetzales\b|\bgtq\b/.test(text)) return "GT";
-  if (/\bpanama\b|\bpa\b/.test(text)) return "PA";
-  if (/\bhonduras\b|\bhn\b/.test(text)) return "HN";
-  if (/\bnicaragua\b|\bni\b/.test(text)) return "NI";
-  if (/\bel salvador\b|\bsv\b/.test(text)) return "SV";
-  return COUNTRY_CONFIG[defaultCountry] ? defaultCountry : "CR";
+  return "CR";
 }
 
 function defaultCurrencyForCountry(country) {
@@ -184,10 +162,6 @@ function defaultCurrencyForCountry(country) {
 function detectCurrency(text, country, defaultCurrency) {
   if (/\busd\b|dolares?|\$|\bverdes?\b/.test(text)) return "USD";
   if (/\bcrc\b|colones?\b/.test(text)) return "CRC";
-  if (/\bmxn\b|pesos?\b/.test(text) && country === "MX") return "MXN";
-  if (/\bgtq\b|quetzales?\b/.test(text)) return "GTQ";
-  if (/\bhnl\b|lempiras?\b/.test(text)) return "HNL";
-  if (/\bnio\b|cordobas?\b/.test(text)) return "NIO";
   return defaultCurrency || defaultCurrencyForCountry(country);
 }
 
@@ -276,7 +250,6 @@ function detectProduct(text) {
 
 function minimumAssetInput(currency) {
   if (currency === "USD") return 1000;
-  if (currency === "GTQ" || currency === "HNL" || currency === "NIO") return 10000;
   return 100000;
 }
 
@@ -1325,7 +1298,7 @@ function buildReply(input) {
     return {
       message: [
         "Hola, soy " + bold("PreCali AI") + ", tu precalificador de confianza.",
-        "Soy tu puente digital con bancos en Mexico y Centroamerica.",
+        "Soy tu puente digital con bancos de Costa Rica.",
         "Te ayudo a comparar, perfilarte y aplicar sin filas ni papeleo fisico.",
         "Dame ingresos, deudas, si es casa o carro, y la prima que puedes aportar.",
         "Uso tu moneda local por defecto. Si quieres cotizar en dolares, dimelo.",
