@@ -2,6 +2,15 @@ const { calcularPrecalificacion, consultarRequisitos } = require("./precali-tool
 const { resolverDuda } = require("./precali-agent");
 
 const DEFAULT_CURRENCY = { CR: "CRC", MX: "MXN", GT: "GTQ", PA: "USD", HN: "HNL", NI: "NIO", SV: "USD" };
+const COUNTRY_CURRENCIES = {
+  CR: ["CRC", "USD"],
+  MX: ["MXN", "USD"],
+  GT: ["GTQ", "USD"],
+  PA: ["USD"],
+  HN: ["HNL", "USD"],
+  NI: ["NIO", "USD"],
+  SV: ["USD"],
+};
 const PRODUCT_LABEL = { personal: "credito personal", vehiculo: "credito vehicular", hipoteca: "credito de vivienda" };
 const PRODUCT_ASSET_WORD = { vehiculo: "vehiculo", hipoteca: "propiedad" };
 const LEAD_EMPTY = { fullName: "", idNumber: "", email: "", incomeSource: "", phoneOverride: "" };
@@ -74,18 +83,45 @@ function hasNoDebtSignal(text) {
   return /\b(no\s+debo|no\s+tengo\s+deudas?|sin\s+deudas?|deuda\s+cero|no\s+pago\s+deudas?)\b/i.test(normalize(text));
 }
 
+function detectCurrencyFromText(text, country) {
+  const raw = String(text || "").toLowerCase();
+  const t = normalize(text);
+  const countryCode = String(country || "CR").toUpperCase();
+
+  if (/\busd\b|dolares?|dollars?|verdes?|americanos?/.test(t)) return "USD";
+  if (/\bcrc\b|colones?|colon costarricense|costarricenses|₡/.test(t)) return "CRC";
+  if (/\bmxn\b|pesos mexicanos?|peso mexicano/.test(t)) return "MXN";
+  if (/\bgtq\b|quetzales?/.test(t)) return "GTQ";
+  if (/\bhnl\b|lempiras?/.test(t)) return "HNL";
+  if (/\bnio\b|cordobas?/.test(t)) return "NIO";
+
+  if (raw.includes("$")) {
+    if (countryCode === "MX") return "MXN";
+    return "USD";
+  }
+
+  return "";
+}
+
+function allowedCurrency(currency, country) {
+  const normalized = String(currency || "").toUpperCase();
+  const allowed = COUNTRY_CURRENCIES[String(country || "CR").toUpperCase()] || ["CRC", "USD"];
+  return allowed.includes(normalized) ? normalized : "";
+}
+
 function labeledAmount(text, labels) {
   const raw = normalize(text);
   const label = labels.join("|");
   const amount = String.raw`\d+(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?`;
   const amountWithSuffix = String.raw`(?:${amount})\s*(?:millon(?:es)?|mill\b|mil\b|k\b|m\b)?`;
+  const currencyWords = String.raw`(?:usd|dolares?|dollars?|crc|colones?|mxn|pesos?|gtq|quetzales?|hnl|lempiras?|nio|cordobas?|verdes?)`;
   const after = new RegExp(String.raw`\b(?:${label})\b[^\d]{0,30}(${amountWithSuffix})`, "i");
-  const before = new RegExp(String.raw`(${amountWithSuffix})\s*(?:de\s+)?(?:${label})\b`, "i");
+  const before = new RegExp(String.raw`(${amountWithSuffix})(?:\s*${currencyWords})?\s*(?:de\s+)?(?:${label})\b`, "i");
   const match = raw.match(after) || raw.match(before);
   return match && match[1] ? extractAmount(match[1]) : null;
 }
 
-function extractFreeTextData(text) {
+function extractFreeTextData(text, country) {
   const product = detectProductFromText(text);
   const income = labeledAmount(text, ["gano", "gana", "ganamos", "ingreso", "ingresos", "salario", "sueldo", "neto"]);
   const noDebt = hasNoDebtSignal(text);
@@ -95,6 +131,7 @@ function extractFreeTextData(text) {
   const downPayment = labeledAmount(text, ["prima", "enganche", "aporte", "abono", "ahorro", "ahorros", "ahorrado", "ahorrados"]);
   return {
     product,
+    currency: detectCurrencyFromText(text, country),
     income,
     debt,
     debtKnown: noDebt || debt !== null,
@@ -320,8 +357,8 @@ async function stepPedirProducto({ session, buttonPayload, bodyText, defaultCoun
   }
 
   const country = session.profile.country || defaultCountry || "CR";
-  const currency = DEFAULT_CURRENCY[country] || "CRC";
-  const extracted = bodyText ? extractFreeTextData(bodyText) : {};
+  const extracted = bodyText ? extractFreeTextData(bodyText, country) : {};
+  const currency = allowedCurrency(extracted.currency, country) || session.profile.currency || DEFAULT_CURRENCY[country] || "CRC";
   const debtKnown = Boolean(extracted.debtKnown);
   const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
   const s = {
@@ -352,7 +389,7 @@ async function stepPedirProducto({ session, buttonPayload, bodyText, defaultCoun
 }
 
 async function stepPedirIngreso({ session, bodyText }) {
-  const extracted = extractFreeTextData(bodyText);
+  const extracted = extractFreeTextData(bodyText, session.profile.country);
   const amount = extracted.income || extractAmount(bodyText);
   if (amount === null || amount <= 0 || isApproximateAmount(bodyText)) {
     return { actions: [actionTexto(exactAmountMessage("ingreso neto mensual"))], session };
@@ -360,11 +397,13 @@ async function stepPedirIngreso({ session, bodyText }) {
 
   const debtKnown = Boolean(extracted.debtKnown);
   const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
+  const currency = allowedCurrency(extracted.currency, session.profile.country) || session.profile.currency;
   const s = {
     ...session,
     step: "pedir_deudas",
     profile: {
       ...session.profile,
+      currency,
       income: amount,
       debt: debtKnown ? extracted.debt : session.profile.debt,
       downPayment: downPaymentKnown ? extracted.downPayment : session.profile.downPayment,
@@ -382,7 +421,7 @@ async function stepPedirIngreso({ session, bodyText }) {
 }
 
 async function stepPedirDeudas({ session, bodyText }) {
-  const extracted = extractFreeTextData(bodyText);
+  const extracted = extractFreeTextData(bodyText, session.profile.country);
   const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
   if (extracted.debtKnown) {
     const profile = {

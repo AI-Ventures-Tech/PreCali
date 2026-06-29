@@ -79,6 +79,12 @@ function normalizeProduct(value) {
   return null;
 }
 
+function normalizeCurrency(value) {
+  const currency = String(value || "").toUpperCase();
+  if (["CRC", "USD", "MXN", "GTQ", "HNL", "NIO"].includes(currency)) return currency;
+  return null;
+}
+
 function normalizeAiResult(result) {
   const profile = result && result.profile ? result.profile : {};
   const document = result && result.document ? result.document : {};
@@ -86,6 +92,7 @@ function normalizeAiResult(result) {
   return {
     profile: {
       product: normalizeProduct(profile.product),
+      currency: normalizeCurrency(profile.currency),
       income: normalizeNumber(profile.income),
       debt: normalizeNumber(profile.debt),
       downPayment: normalizeNumber(profile.downPayment),
@@ -122,10 +129,13 @@ function buildSchema() {
       profile: {
         type: "object",
         additionalProperties: false,
-        required: ["product", "income", "debt", "downPayment", "assetValue", "requestedYears"],
+        required: ["product", "currency", "income", "debt", "downPayment", "assetValue", "requestedYears"],
         properties: {
           product: {
             anyOf: [{ type: "string", enum: ["personal", "vehiculo", "hipoteca"] }, { type: "null" }],
+          },
+          currency: {
+            anyOf: [{ type: "string", enum: ["CRC", "USD", "MXN", "GTQ", "HNL", "NIO"] }, { type: "null" }],
           },
           income: nullableNumber,
           debt: nullableNumber,
@@ -165,7 +175,8 @@ function buildExtractionPrompt(body, mediaType) {
     "Usa salario/ingreso NETO si existe. Si solo existe salario bruto, ponlo en grossIncome y usa income solo si el documento indica neto o liquido.",
     "No trates rebajos legales de planilla como deudas mensuales, excepto si aparecen como prestamos, cuotas, embargos, pension u obligaciones recurrentes.",
     "Producto: hipoteca para casa/vivienda/lote/terreno/propiedad; vehiculo para carro/auto/moto; personal para prestamo personal o si no hay garantia.",
-    "Moneda base para este MVP: CRC. Devuelve numeros puros, sin simbolos ni separadores.",
+    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses, USD para dolares, MXN, GTQ, HNL o NIO segun corresponda.",
+    "Devuelve numeros puros en la moneda detectada del mensaje. No uses simbolos ni separadores.",
     "Si hay documento adjunto, clasificalo y extrae nombre, cedula, patrono, ingreso bruto y neto cuando se pueda.",
     "",
     "Mensaje de WhatsApp:",
@@ -187,7 +198,8 @@ function buildGroqExtractionPrompt(body, recentMessages) {
     "No inventes montos. Si no sabes algo, usa null o array vacio.",
     "Usa producto: personal, vehiculo o hipoteca.",
     "Si el usuario hace una pregunta de seguimiento, usa el contexto reciente para inferir a que se refiere.",
-    "Moneda base: devuelve numeros puros en la moneda detectada del mensaje. No uses simbolos ni separadores.",
+    "Detecta la moneda si el usuario la menciona. Usa CRC para colones costarricenses, USD para dolares, MXN, GTQ, HNL o NIO segun corresponda.",
+    "Devuelve numeros puros en la moneda detectada del mensaje. No uses simbolos ni separadores.",
     "",
     "Contexto reciente del chat:",
     historyLines,
@@ -195,7 +207,7 @@ function buildGroqExtractionPrompt(body, recentMessages) {
     "Mensaje actual:",
     body || "(sin texto)",
     "",
-    'Devuelve un objeto JSON con esta forma exacta: {"profile":{"product":string|null,"income":number|null,"debt":number|null,"downPayment":number|null,"assetValue":number|null,"requestedYears":number|null},"document":{"type":null,"name":null,"idNumber":null,"employer":null,"grossIncome":null,"netIncome":null},"confidence":number,"missing":[string],"notes":string}',
+    'Devuelve un objeto JSON con esta forma exacta: {"profile":{"product":string|null,"currency":string|null,"income":number|null,"debt":number|null,"downPayment":number|null,"assetValue":number|null,"requestedYears":number|null},"document":{"type":null,"name":null,"idNumber":null,"employer":null,"grossIncome":null,"netIncome":null},"confidence":number,"missing":[string],"notes":string}',
   ].join("\n");
 }
 
@@ -212,6 +224,7 @@ function buildGroqDocumentPrompt(body, recentMessages, documentText) {
     "Usa ingreso neto/liquido si aparece. Si solo hay bruto, colocalo como grossIncome y usa income solo si no hay neto.",
     "No trates deducciones de ley como deuda. Solo usa deuda si dice prestamo, tarjeta, embargo, pension, cuota u obligacion recurrente.",
     "Producto: hipoteca para casa/vivienda/lote/terreno/propiedad; vehiculo para carro/auto/moto; personal si no hay garantia.",
+    "Detecta la moneda si aparece en el mensaje o documento. Usa CRC, USD, MXN, GTQ, HNL o NIO. Si no aparece, usa null.",
     "",
     "Contexto reciente del chat:",
     historyLines,
@@ -222,7 +235,7 @@ function buildGroqDocumentPrompt(body, recentMessages, documentText) {
     "Texto extraido del documento:",
     String(documentText || "").slice(0, 12000),
     "",
-    'Devuelve un objeto JSON con esta forma exacta: {"profile":{"product":string|null,"income":number|null,"debt":number|null,"downPayment":number|null,"assetValue":number|null,"requestedYears":number|null},"document":{"type":string|null,"name":string|null,"idNumber":string|null,"employer":string|null,"grossIncome":number|null,"netIncome":number|null},"confidence":number,"missing":[string],"notes":string}',
+    'Devuelve un objeto JSON con esta forma exacta: {"profile":{"product":string|null,"currency":string|null,"income":number|null,"debt":number|null,"downPayment":number|null,"assetValue":number|null,"requestedYears":number|null},"document":{"type":string|null,"name":string|null,"idNumber":string|null,"employer":string|null,"grossIncome":number|null,"netIncome":number|null},"confidence":number,"missing":[string],"notes":string}',
   ].join("\n");
 }
 
