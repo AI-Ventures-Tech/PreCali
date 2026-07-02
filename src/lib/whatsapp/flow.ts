@@ -1,0 +1,1040 @@
+// ============================================================
+// PreCali AI — Flujo guiado de la conversacion (maquina de estados)
+// ============================================================
+// Port fiel de `api/_lib/precali-flow.js` (CommonJS → TypeScript).
+//
+// Este modulo es el cerebro del bot: decide en que paso esta la
+// conversacion, que botones/listas mostrar, como interpretar el
+// texto libre (con ayuda de IA) y cuando calcular la precalificacion.
+// El agente (`agent.ts`) solo entra para resolver dudas puntuales.
+//
+// La entrada principal es `handleIncoming`, que el webhook (S15)
+// invoca con el mensaje entrante normalizado y la sesion persistida.
+
+import type { PaisId } from "@/types/precali";
+import {
+  type Action,
+  type ButtonOption,
+  type HandleIncomingResult,
+  type IncomingMessage,
+  type Lead,
+  type Session,
+} from "@/lib/whatsapp/types";
+import { calcularPrecalificacion, consultarRequisitos, type CalcularResult, type CalcOpcion } from "@/lib/whatsapp/tools";
+import { resolverDuda, type ChatMessage } from "@/lib/whatsapp/agent";
+import { analyzeWithPreCaliAi, type NormalizedAiResult } from "@/lib/whatsapp/ai";
+
+const DEFAULT_CURRENCY: Record<string, string> = { CR: "CRC" };
+const COUNTRY_CURRENCIES: Record<string, string[]> = {
+  CR: ["CRC", "USD"],
+};
+const PRODUCT_LABEL: Record<string, string> = {
+  personal: "credito personal",
+  vehiculo: "credito vehicular",
+  hipoteca: "credito de vivienda",
+};
+const PRODUCT_ASSET_WORD: Record<string, string> = { vehiculo: "vehiculo", hipoteca: "propiedad" };
+const LEAD_EMPTY: Lead = { fullName: "", idNumber: "", email: "", incomeSource: "", phoneOverride: "" };
+
+// ---------- Tipos internos ----------
+
+interface FreeTextData {
+  product: string | null;
+  currency: string;
+  income: number | null;
+  debt: number | null;
+  debtKnown: boolean;
+  downPayment: number | null;
+}
+
+interface NextFlags {
+  debtKnown: boolean;
+  downPaymentKnown: boolean;
+}
+
+// ---------- Normalizacion y parseo de montos ----------
+
+function normalize(text: unknown): string {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function isResetCommand(text: unknown): boolean {
+  return /^(menu|reiniciar|empezar de nuevo|otro credito|volver al inicio|inicio)$/i.test(normalize(text));
+}
+
+function extractAmount(text: unknown): number | null {
+  const raw = normalize(text);
+  if (!raw) return null;
+  if (/^(0|cero|no\s*tengo|nada|ningun[oa]?|sin)$/i.test(raw)) return 0;
+
+  const match = raw.match(/(\d+(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(millon(?:es)?|mill\b|mil\b|k\b|m\b)?/);
+  if (!match || !match[1]) return null;
+
+  let numStr = match[1].replace(/\s/g, "");
+  const suffix = match[2] || "";
+  const hasDot = numStr.includes(".");
+  const hasComma = numStr.includes(",");
+
+  if (suffix) {
+    numStr = numStr.replace(",", ".");
+  } else if (hasDot && hasComma) {
+    numStr =
+      numStr.lastIndexOf(",") > numStr.lastIndexOf(".")
+        ? numStr.replace(/\./g, "").replace(",", ".")
+        : numStr.replace(/,/g, "");
+  } else if (hasComma) {
+    const parts = numStr.split(",");
+    numStr = parts[parts.length - 1].length === 2 ? parts.join(".") : numStr.replace(/,/g, "");
+  } else if (hasDot) {
+    const parts = numStr.split(".");
+    if (parts.length > 2 || parts[parts.length - 1].length !== 2) numStr = numStr.replace(/\./g, "");
+  }
+
+  let value = Number(numStr);
+  if (!Number.isFinite(value)) return null;
+  if (/^mill/.test(suffix)) value *= 1000000;
+  else if (/^mil$/.test(suffix)) value *= 1000;
+  else if (/^k$/.test(suffix)) value *= 1000;
+  else if (/^m$/.test(suffix)) value *= 1000000;
+  return Math.max(0, Math.round(value));
+}
+
+function isApproximateAmount(text: unknown): boolean {
+  return /\b(como|aprox|aproximad|mas o menos|alrededor|cerca de|tipo)\b/i.test(normalize(text));
+}
+
+function exactAmountMessage(label: string): string {
+  return `Necesito el monto exacto de ${label}. Escribilo solo como numero, por ejemplo: 150000.`;
+}
+
+function totalDataSteps(product: string): number {
+  return product === "personal" ? 2 : 3;
+}
+
+function phaseLine(product: string, index: number, label: string, icon: string): string {
+  return `${icon} *Fase ${index}/${totalDataSteps(product)}: ${label}*`;
+}
+
+function hasNoDebtSignal(text: unknown): boolean {
+  return /\b(no\s+debo|no\s+devo|no\s+tengo\s+deudas?|sin\s+deudas?|deuda\s+cero|no\s+pago\s+deudas?)\b/i.test(normalize(text));
+}
+
+function detectCurrencyFromText(text: unknown, _country: string): string {
+  const raw = String(text || "").toLowerCase();
+  const t = normalize(text);
+
+  if (/\busd\b|dolares?|dollars?|verdes?|americanos?/.test(t)) return "USD";
+  if (/\bcrc\b|colones?|colon costarricense|costarricenses|₡/.test(t)) return "CRC";
+  if (raw.includes("$")) return "USD";
+
+  return "";
+}
+
+function allowedCurrency(currency: unknown, _country: string): string {
+  const normalized = String(currency || "").toUpperCase();
+  const allowed = COUNTRY_CURRENCIES.CR;
+  return allowed.includes(normalized) ? normalized : "";
+}
+
+function labeledAmount(text: unknown, labels: string[]): number | null {
+  const raw = normalize(text);
+  const label = labels.join("|");
+  const amount = String.raw`\d+(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?`;
+  const amountWithSuffix = String.raw`(?:${amount})\s*(?:millon(?:es)?|mill\b|mil\b|k\b|m\b)?`;
+  const currencyWords = String.raw`(?:usd|dolares?|dollars?|crc|colones?|verdes?)`;
+  const after = new RegExp(String.raw`\b(?:${label})\b[^\d]{0,30}(${amountWithSuffix})`, "i");
+  const before = new RegExp(String.raw`(${amountWithSuffix})(?:\s*${currencyWords})?\s*(?:de\s+)?(?:${label})\b`, "i");
+  const match = raw.match(after) || raw.match(before);
+  return match && match[1] ? extractAmount(match[1]) : null;
+}
+
+function extractFreeTextData(text: unknown, country: string): FreeTextData {
+  const product = detectProductFromText(text);
+  const income = labeledAmount(text, ["gano", "gana", "gno", "ganamos", "ingreso", "ingresos", "salario", "sueldo", "neto"]);
+  const noDebt = hasNoDebtSignal(text);
+  const debt = noDebt
+    ? 0
+    : labeledAmount(text, ["debo", "devo", "deuda", "deudas", "pago", "pagos", "cuota", "cuotas", "prestamo", "tarjeta"]);
+  const downPayment = labeledAmount(text, ["prima", "enganche", "aporte", "abono", "ahorro", "ahorros", "ahorrado", "ahorrados"]);
+  return {
+    product,
+    currency: detectCurrencyFromText(text, country),
+    income,
+    debt,
+    debtKnown: noDebt || debt !== null,
+    downPayment,
+  };
+}
+
+function valueKnown(value: unknown): boolean {
+  return value !== null && value !== undefined;
+}
+
+function mergeAiExtraction(extracted: FreeTextData, aiProfile: NormalizedAiResult["profile"] | null, country: string): FreeTextData {
+  const ai = aiProfile || ({} as NormalizedAiResult["profile"]);
+  const aiCurrency = allowedCurrency(ai.currency, country);
+  const debtKnown = extracted.debtKnown || valueKnown(ai.debt);
+  return {
+    product: extracted.product || ai.product || null,
+    currency: extracted.currency || aiCurrency || "",
+    income: valueKnown(extracted.income) ? extracted.income : ai.income,
+    debt: extracted.debtKnown ? extracted.debt : valueKnown(ai.debt) ? ai.debt : extracted.debt,
+    debtKnown,
+    downPayment: valueKnown(extracted.downPayment) ? extracted.downPayment : ai.downPayment,
+  };
+}
+
+async function extractSmartTextData({
+  session,
+  bodyText,
+  defaultCountry,
+}: {
+  session: Session;
+  bodyText: string;
+  defaultCountry: string;
+}): Promise<FreeTextData> {
+  const country = (session && session.profile && session.profile.country) || defaultCountry || "CR";
+  const extracted = extractFreeTextData(bodyText, country);
+
+  try {
+    const ai = await analyzeWithPreCaliAi({
+      body: bodyText,
+      recentMessages: [
+        `Paso actual: ${(session && session.step) || "inicio"}`,
+        `Perfil actual: ${JSON.stringify((session && session.profile) || {})}`,
+      ],
+    });
+    if (ai && ai.profile && Number(ai.confidence || 0) >= 0.45) {
+      return mergeAiExtraction(extracted, ai.profile, country);
+    }
+  } catch {
+    // El filtro IA es una ayuda, no debe romper el flujo guiado.
+  }
+
+  return extracted;
+}
+
+async function promptForNextMissing(session: Session, flags: NextFlags): Promise<HandleIncomingResult> {
+  const profile = session.profile || ({} as Session["profile"]);
+  if (!profile.income) {
+    return {
+      actions: [actionTexto(`${phaseLine(profile.product, 1, "Ingreso", "💰")}\n¿Cuanto es tu ingreso neto mensual exacto?`)],
+      session: { ...session, step: "pedir_ingreso" },
+    };
+  }
+
+  if (!flags.debtKnown) {
+    return {
+      actions: [actionTexto(`${phaseLine(profile.product, 2, "Deudas", "💳")}\n¿Tenes alguna deuda mensual actual?\nSi tenes, escribi el monto exacto.\nSi no tenes deudas, escribi 0.`)],
+      session: { ...session, step: "pedir_deudas" },
+    };
+  }
+
+  if (profile.product !== "personal" && profile.downPayment <= 0 && !flags.downPaymentKnown) {
+    const bien = PRODUCT_ASSET_WORD[profile.product] || "bien";
+    const icon = profile.product === "hipoteca" ? "🏠" : "🚗";
+    return {
+      actions: [actionTexto(`${phaseLine(profile.product, 3, "Prima", icon)}\n¿Con cuanto de prima o enganche contas para ${bien === "propiedad" ? "la" : "el"} ${bien}?\nSi no tenes prima, escribi 0.`)],
+      session: { ...session, step: "pedir_prima" },
+    };
+  }
+
+  return calcularYMostrar(session);
+}
+
+// ---------- Formato de resultados / bancos visibles ----------
+
+function money(value: unknown, currency: string): string {
+  return currency + " " + Math.max(0, Math.round(Number(value) || 0)).toLocaleString("es-CR");
+}
+
+function asCalc(value: unknown): CalcularResult | null {
+  return value && typeof value === "object" ? (value as CalcularResult) : null;
+}
+
+function visibleOpciones(calcUnknown: unknown): CalcOpcion[] {
+  const calc = asCalc(calcUnknown);
+  const opciones = (calc && calc.opciones) || [];
+  if (!opciones.length) return [];
+  const top = opciones.slice(0, 3);
+  const recomendado =
+    calc && calc.recomendacion && calc.recomendacion.banco
+      ? opciones.find((o) => o.banco === calc.recomendacion!.banco)
+      : null;
+  if (!recomendado || top.some((o) => o.banco === recomendado.banco)) return top;
+  return [recomendado, ...top].slice(0, 3);
+}
+
+function topBankOptions(session: Session): ButtonOption[] {
+  return visibleOpciones(session.lastResults)
+    .slice(0, 3)
+    .map((o, i) => ({ id: "banco_" + i, title: o.banco.slice(0, 20) }));
+}
+
+// ---------- Coercion de payloads y seleccion de banco ----------
+
+function coerceButtonPayload(session: Session, buttonPayload: string | undefined, bodyText: unknown): string {
+  if (buttonPayload) return buttonPayload;
+  const text = normalize(bodyText);
+  if (!text) return "";
+
+  if (session.step === "post_resultado") {
+    const hasOptions = Boolean(asCalc(session.lastResults) && asCalc(session.lastResults)!.opciones && asCalc(session.lastResults)!.opciones.length);
+    if (/^(1|aplicar|si aplicar|si)$/.test(text)) return hasOptions ? "aplicar" : "otro_dato";
+    if (/^(2|requisitos|ver requisitos|analisis|ver analisis)$/.test(text)) return hasOptions ? "requisitos" : "menu";
+    if (/^(3|ahora no|mas tarde|no)$/.test(text)) return "ahora_no";
+  }
+
+  if (session.step === "elegir_banco_aplicar" || session.step === "elegir_banco_requisitos") {
+    if (/^[123]$/.test(text)) return "banco_" + (Number(text) - 1);
+  }
+
+  if (session.step === "lead_fuente_ingresos") {
+    if (/^(1|asalariado)$/.test(text)) return "asalariado";
+    if (/^(2|independiente)$/.test(text)) return "independiente";
+    if (/^(3|duda|tengo duda)$/.test(text)) return "duda";
+  }
+
+  if (session.step === "autorizar_soft_precali") {
+    if (/^(1|si|autorizo|acepto|dale)$/.test(text)) return "soft_precali_si";
+    if (/^(2|duda|tengo duda)$/.test(text)) return "duda";
+    if (/^(3|no|mejor no)$/.test(text)) return "soft_precali_no";
+  }
+
+  if (session.step === "confirmar_datos_extraidos") {
+    if (/^(1|si|correcto|ok|esta bien)$/.test(text)) return "datos_ok";
+    if (/^(2|corregir|datos corregir)$/.test(text)) return "datos_corregir";
+    if (/^(3|duda|tengo duda)$/.test(text)) return "duda";
+  }
+
+  if (session.step === "confirmar_hard_pull") {
+    if (/^(1|si|autorizo|autorizo al banco)$/.test(text)) return "hard_si";
+    if (/^(2|duda|tengo duda)$/.test(text)) return "duda";
+    if (/^(3|no|mejor no)$/.test(text)) return "hard_no";
+  }
+
+  return "";
+}
+
+function bankFromSelection(session: Session, buttonPayload: string | undefined, bodyText: unknown): string {
+  const visibles = visibleOpciones(session.lastResults);
+  const match = /^banco_(\d+)$/.exec(buttonPayload || "");
+  if (match && visibles[Number(match[1])]) return visibles[Number(match[1])].banco;
+  if (bodyText) {
+    const text = normalize(bodyText);
+    const found = visibles.find((o) => text.includes(normalize(o.banco)));
+    if (found) return found.banco;
+  }
+  return "";
+}
+
+// ---------- Parseo de datos del lead / documentos ----------
+
+function parseLeadData(text: unknown): { fullName: string; idNumber: string; email: string } {
+  const raw = String(text || "").trim();
+  const email = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const idNumber = raw.match(/\b\d[-\s]?\d{3,4}[-\s]?\d{3,5}\b|\b\d{7,15}\b/)?.[0] || "";
+  const cleaned = raw
+    .replace(email, " ")
+    .replace(idNumber, " ")
+    .replace(/nombre|cedula|c[eé]dula|identidad|correo|email|e-mail/gi, " ");
+  const fullName =
+    cleaned
+      .split(/\n|,|;/)
+      .map((part) => part.trim())
+      .find((part) => /[a-zA-ZÁÉÍÓÚÜÑáéíóúüñ]{2,}\s+[a-zA-ZÁÉÍÓÚÜÑáéíóúüñ]{2,}/.test(part)) || "";
+  return { fullName, idNumber, email };
+}
+
+function requestedDocuments(session: Session): string[] {
+  const docs: string[] = [];
+  const source = session.lead && session.lead.incomeSource;
+  if (source === "asalariado") docs.push("Orden patronal o comprobantes de pago recientes.");
+  if (source === "independiente") docs.push("Certificacion de ingresos por CPA o estados de cuenta de los ultimos 6 meses.");
+  if (session.profile.product === "vehiculo") docs.push("Proforma del vehiculo.");
+  if (session.profile.product === "hipoteca") docs.push("Proforma, opcion de compra o avaluo preliminar de la propiedad.");
+  return docs;
+}
+
+function extractDocumentSummary(text: unknown): string {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  const cedula = clean.match(/(?:cedula|c[eé]dula|identidad)[:\s-]*([0-9][0-9\-\s]{6,18})/i)?.[1]?.trim() || "";
+  const patrono =
+    clean.match(/(?:patrono|empresa|empleador)[:\s-]*([A-ZÁÉÍÓÚÜÑa-záéíóúüñ0-9 .,&-]{3,60}?)(?=\s+(?:salario|ingreso|neto|cedula|c[eé]dula)\b|$)/i)?.[1]?.trim() ||
+    "";
+  const salario = clean.match(/(?:salario|ingreso|neto|liquido|l[ií]quido)[:\s-]*(?:CRC|₡|USD|\$)?\s*([0-9][0-9.,\s]{3,18})/i)?.[1]?.trim() || "";
+  const lines: string[] = [];
+  if (salario) lines.push(`Ingreso detectado: ${salario}`);
+  if (patrono) lines.push(`Patrono detectado: ${patrono}`);
+  if (cedula) lines.push(`Cedula detectada: ${cedula}`);
+  if (!lines.length) lines.push("Documento recibido. No pude leer todos los campos automaticamente.");
+  return lines.join("\n");
+}
+
+function formatResultados(calc: CalcularResult): string {
+  if (!calc.opciones.length) {
+    const lines = ["Con esos datos, hoy *ningun banco de PreCali* te califica todavia."];
+    const aviso = calc.avisos[0];
+    if (aviso) lines.push(aviso.detalle);
+    lines.push("Quieres que ajustemos algun dato, como deuda, ingreso o prima?");
+    return lines.join("\n");
+  }
+
+  const lines = [`Comparativa preliminar para ${calc.producto}:`, ""];
+  for (const o of visibleOpciones(calc)) {
+    lines.push(
+      `*${o.banco}*`,
+      `- Tasa: ${o.tasa_anual_pct}% anual | Plazo: ${o.plazo_anos} anos`,
+      `- Cuota estimada: *${money(o.cuota_mensual, calc.moneda)}/mes*`,
+      `- Monto maximo: ${money(o.monto_maximo, calc.moneda)}`,
+      "",
+    );
+  }
+  if (calc.calidad_datos && calc.calidad_datos.startsWith("referencial")) {
+    lines.push("Datos de bancos de Costa Rica, sujetos a validacion final de cada entidad.");
+  }
+  return lines.join("\n").trim();
+}
+
+async function manejarDuda({ session, userText }: { session: Session; userText: string }): Promise<{ message: string; aiHistory: ChatMessage[] }> {
+  const result = await resolverDuda({
+    aiHistory: session.aiHistory as ChatMessage[] | undefined,
+    userText,
+    context: { country: session.profile.country, step: session.step, profile: session.profile },
+  });
+  return { message: result.message, aiHistory: result.aiHistory };
+}
+
+// ---------- Builders de acciones ----------
+
+function actionBotones(body: string, options: ButtonOption[]): Action {
+  return { kind: "buttons", body, options };
+}
+
+function actionTexto(body: string): Action {
+  return { kind: "text", body };
+}
+
+function actionListaProducto(): Action {
+  return actionBotones("Hola. Soy *PreCali IA*, tu asesor de credito. Que queres simular hoy?", [
+    { id: "personal", title: "Personal" },
+    { id: "vehiculo", title: "Vehiculo" },
+    { id: "hipoteca", title: "Vivienda" },
+  ]);
+}
+
+function start(session: Session): HandleIncomingResult {
+  const s: Session = { ...session, step: "pedir_producto" };
+  return { actions: [actionListaProducto()], session: s };
+}
+
+function detectProductFromText(text: unknown): string | null {
+  const t = normalize(text);
+  if (/^1$/.test(t) || /personal|consumo|libre inversion/.test(t)) return "personal";
+  if (/^2$/.test(t) || /carro|auto|vehicul|veicul|moto|pickup|camioneta/.test(t)) return "vehiculo";
+  if (/^3$/.test(t) || /casa|vivienda|hipotec|apto|apartamento|terreno|lote|propiedad/.test(t)) return "hipoteca";
+  return null;
+}
+
+function postResultActions(): Action {
+  return actionBotones("Que queres hacer?", [
+    { id: "aplicar", title: "Aplicar" },
+    { id: "requisitos", title: "Requisitos" },
+    { id: "ahora_no", title: "Ahora no" },
+  ]);
+}
+
+// ---------- Pasos del flujo ----------
+
+async function stepPedirProducto({
+  session,
+  buttonPayload,
+  bodyText,
+  defaultCountry,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+  defaultCountry: string;
+}): Promise<HandleIncomingResult> {
+  const country = session.profile.country || defaultCountry || "CR";
+  const extracted: FreeTextData = bodyText ? await extractSmartTextData({ session, bodyText, defaultCountry: country }) : ({} as FreeTextData);
+  let product: string | null = null;
+  if (buttonPayload && ["personal", "vehiculo", "hipoteca"].includes(buttonPayload)) product = buttonPayload;
+  else if (bodyText) product = extracted.product || detectProductFromText(bodyText);
+
+  if (!product) {
+    return { actions: [actionListaProducto()], session };
+  }
+
+  const currency = allowedCurrency(extracted.currency, country) || session.profile.currency || DEFAULT_CURRENCY[country] || "CRC";
+  const debtKnown = Boolean(extracted.debtKnown);
+  const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
+  const s: Session = {
+    ...session,
+    step: "pedir_ingreso",
+    lead: session.lead || { ...LEAD_EMPTY },
+    profile: {
+      ...session.profile,
+      product,
+      country,
+      currency,
+      income: extracted.income || session.profile.income || 0,
+      debt: debtKnown ? (extracted.debt ?? 0) : session.profile.debt || 0,
+      downPayment: downPaymentKnown ? (extracted.downPayment ?? 0) : session.profile.downPayment || 0,
+    },
+  };
+
+  if (s.profile.income || debtKnown || downPaymentKnown) {
+    return promptForNextMissing(s, { debtKnown, downPaymentKnown });
+  }
+
+  return {
+    actions: [
+      actionTexto(
+        `Perfecto, *${PRODUCT_LABEL[product]}*.\nPara armar tu comparacion voy a pedirte los datos paso a paso.\n\n${phaseLine(product, 1, "Ingreso", "💰")}\n¿Cuanto es tu ingreso neto mensual exacto?`,
+      ),
+    ],
+    session: s,
+  };
+}
+
+async function stepPedirIngreso({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  const extracted = await extractSmartTextData({ session, bodyText, defaultCountry: session.profile.country });
+  const amount = extracted.income || extractAmount(bodyText);
+  if (amount === null || amount <= 0 || isApproximateAmount(bodyText)) {
+    return { actions: [actionTexto(exactAmountMessage("ingreso neto mensual"))], session };
+  }
+
+  const debtKnown = Boolean(extracted.debtKnown);
+  const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
+  const currency = allowedCurrency(extracted.currency, session.profile.country) || session.profile.currency;
+  const s: Session = {
+    ...session,
+    step: "pedir_deudas",
+    profile: {
+      ...session.profile,
+      currency,
+      income: amount,
+      debt: debtKnown ? (extracted.debt ?? session.profile.debt) : session.profile.debt,
+      downPayment: downPaymentKnown ? (extracted.downPayment ?? session.profile.downPayment) : session.profile.downPayment,
+    },
+  };
+
+  if (debtKnown || downPaymentKnown) {
+    return promptForNextMissing(s, { debtKnown, downPaymentKnown });
+  }
+
+  return {
+    actions: [actionTexto(`${phaseLine(session.profile.product, 2, "Deudas", "💳")}\n¿Tenes alguna deuda mensual actual?\nSi tenes, escribi el monto exacto.\nSi no tenes deudas, escribi 0.`)],
+    session: s,
+  };
+}
+
+async function stepPedirDeudas({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  const extracted = await extractSmartTextData({ session, bodyText, defaultCountry: session.profile.country });
+  const downPaymentKnown = extracted.downPayment !== null && extracted.downPayment !== undefined;
+  if (extracted.debtKnown) {
+    const profile = {
+      ...session.profile,
+      debt: extracted.debt ?? 0,
+      downPayment: downPaymentKnown ? (extracted.downPayment ?? session.profile.downPayment) : session.profile.downPayment,
+    };
+    const s: Session = { ...session, profile };
+    return promptForNextMissing(s, { debtKnown: true, downPaymentKnown });
+  }
+
+  if (downPaymentKnown) {
+    const s: Session = { ...session, profile: { ...session.profile, downPayment: extracted.downPayment ?? session.profile.downPayment } };
+    return promptForNextMissing(s, { debtKnown: false, downPaymentKnown: true });
+  }
+
+  if (/^(si|sí|claro|tengo|correcto)$/i.test(normalize(bodyText))) {
+    return { actions: [actionTexto("Perfecto. ¿Cuanto pagas en deudas mensuales? Escribi el monto exacto, por ejemplo: 150000.")], session };
+  }
+
+  const amount = extractAmount(bodyText);
+  if (amount === null || isApproximateAmount(bodyText)) {
+    return { actions: [actionTexto(exactAmountMessage("deudas mensuales"))], session };
+  }
+
+  const profile = { ...session.profile, debt: amount };
+  if (profile.product === "personal") {
+    return calcularYMostrar({ ...session, profile });
+  }
+
+  if (profile.downPayment > 0) {
+    return calcularYMostrar({ ...session, profile });
+  }
+
+  const s: Session = { ...session, step: "pedir_prima", profile };
+  const bien = PRODUCT_ASSET_WORD[profile.product] || "bien";
+  const icon = profile.product === "hipoteca" ? "🏠" : "🚗";
+  return {
+    actions: [actionTexto(`${phaseLine(profile.product, 3, "Prima", icon)}\n¿Con cuanto de prima o enganche contas para ${bien === "propiedad" ? "la" : "el"} ${bien}?\nSi no tenes prima, escribi 0.`)],
+    session: s,
+  };
+}
+
+async function stepPedirPrima({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  const extracted = await extractSmartTextData({ session, bodyText, defaultCountry: session.profile.country });
+  const amount = valueKnown(extracted.downPayment) ? extracted.downPayment : extractAmount(bodyText);
+  if (amount === null || isApproximateAmount(bodyText)) {
+    return { actions: [actionTexto(exactAmountMessage("prima o enganche"))], session };
+  }
+
+  const profile = { ...session.profile, downPayment: amount };
+  return calcularYMostrar({ ...session, profile });
+}
+
+async function calcularYMostrar(session: Session): Promise<HandleIncomingResult> {
+  const calc = calcularPrecalificacion(session.profile);
+  const s: Session = { ...session, step: "post_resultado", lastResults: calc };
+  if (!s.lead) s.lead = { ...LEAD_EMPTY };
+
+  const texto = formatResultados(calc);
+  if (!calc.opciones.length) {
+    return {
+      actions: [
+        actionTexto(texto),
+        actionBotones("Que queres hacer?", [
+          { id: "otro_dato", title: "Cambiar dato" },
+          { id: "menu", title: "Nuevo credito" },
+          { id: "ahora_no", title: "Ahora no" },
+        ]),
+      ],
+      session: s,
+    };
+  }
+
+  return { actions: [actionTexto(texto), postResultActions()], session: s };
+}
+
+async function stepPostResultado({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  const requestedProduct = buttonPayload ? null : detectProductFromText(bodyText);
+  if (requestedProduct && requestedProduct !== session.profile.product) {
+    const s: Session = {
+      ...session,
+      profile: { ...session.profile, product: requestedProduct },
+    };
+    return calcularYMostrar(s);
+  }
+
+  if (buttonPayload === "aplicar") {
+    const s: Session = { ...session, step: "elegir_banco_aplicar" };
+    return { actions: [actionBotones("A que banco queres aplicar?", topBankOptions(session))], session: s };
+  }
+
+  if (buttonPayload === "requisitos") {
+    const s: Session = { ...session, step: "elegir_banco_requisitos" };
+    return { actions: [actionBotones("De que banco queres ver requisitos?", topBankOptions(session))], session: s };
+  }
+
+  if (buttonPayload === "ahora_no") {
+    const s: Session = { ...session, step: "pausado" };
+    return { actions: [actionTexto("De acuerdo. El chat conserva tu avance por aproximadamente un mes. Cuando quieras retomar, escribi menu.")], session: s };
+  }
+
+  if (buttonPayload === "menu" || isResetCommand(bodyText)) return start({ ...session, step: "inicio" });
+
+  if (buttonPayload === "otro_dato") {
+    const s: Session = { ...session, step: "pedir_ingreso" };
+    return { actions: [actionTexto("Empecemos de nuevo con tu ingreso neto mensual exacto.")], session: s };
+  }
+
+  const bank = bankFromSelection(session, buttonPayload, bodyText);
+  if (bank) return goToLeadCapture(session, bank);
+
+  const { message, aiHistory } = await manejarDuda({ session, userText: bodyText || "(sin texto)" });
+  return { actions: [actionTexto(message), postResultActions()], session: { ...session, aiHistory } };
+}
+
+async function stepElegirBancoAplicar({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  const bank = bankFromSelection(session, buttonPayload, bodyText);
+  if (!bank) {
+    return { actions: [actionBotones("Selecciona el banco para aplicar.", topBankOptions(session))], session };
+  }
+  return goToLeadCapture(session, bank);
+}
+
+async function stepElegirBancoRequisitos({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  const bank = bankFromSelection(session, buttonPayload, bodyText);
+  if (!bank) {
+    return { actions: [actionBotones("Selecciona el banco para ver requisitos.", topBankOptions(session))], session };
+  }
+
+  const result = consultarRequisitos({ banco: bank, producto: session.profile.product, pais: session.profile.country });
+  const lines: string[] = result.encontrado ? [`Requisitos para *${result.banco}*:`] : [`No encontre requisitos cargados para *${bank}*.`];
+  if (result.encontrado) {
+    for (const group of result.requisitos || []) {
+      lines.push(`*${group.categoria || "Documento"}*`);
+      for (const item of group.items || []) lines.push(`- ${item}`);
+    }
+  }
+  return { actions: [actionTexto(lines.join("\n")), postResultActions()], session: { ...session, step: "post_resultado" } };
+}
+
+function goToLeadCapture(session: Session, bankName: string): HandleIncomingResult {
+  const s: Session = {
+    ...session,
+    step: "lead_datos",
+    targetBank: bankName,
+    lead: session.lead || { ...LEAD_EMPTY },
+  };
+  return {
+    actions: [
+      actionTexto(
+        `Para preparar tu expediente para *${bankName}*, necesito estos datos en un solo mensaje:\n` +
+          "Nombre completo\nCedula o identificacion\nCorreo electronico\n\n" +
+          "El telefono sera el mismo desde el que escribiste, salvo que indiques otro.",
+      ),
+    ],
+    session: s,
+  };
+}
+
+async function stepLeadDatos({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  const parsed = parseLeadData(bodyText);
+  const missing: string[] = [];
+  if (!parsed.fullName) missing.push("nombre completo");
+  if (!parsed.idNumber) missing.push("cedula o identificacion");
+  if (!parsed.email) missing.push("correo electronico");
+  if (missing.length) {
+    return { actions: [actionTexto(`Me falta: ${missing.join(", ")}.\nEnviamelo en un solo mensaje para continuar.`)], session };
+  }
+
+  const s: Session = {
+    ...session,
+    step: "lead_fuente_ingresos",
+    lead: { ...(session.lead || LEAD_EMPTY), ...parsed },
+  };
+  return {
+    actions: [
+      actionBotones("Cual es tu fuente principal de ingresos?", [
+        { id: "asalariado", title: "Asalariado" },
+        { id: "independiente", title: "Independiente" },
+        { id: "duda", title: "Tengo duda" },
+      ]),
+    ],
+    session: s,
+  };
+}
+
+async function stepLeadFuenteIngresos({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  let source = "";
+  const text = normalize(bodyText);
+  if (buttonPayload === "asalariado" || /asalariad|emplead|planilla/.test(text)) source = "asalariado";
+  if (buttonPayload === "independiente" || /independ|negocio|freelance|propio/.test(text)) source = "independiente";
+  if (!source) {
+    return {
+      actions: [
+        actionBotones("Selecciona tu fuente principal de ingresos.", [
+          { id: "asalariado", title: "Asalariado" },
+          { id: "independiente", title: "Independiente" },
+          { id: "duda", title: "Tengo duda" },
+        ]),
+      ],
+      session,
+    };
+  }
+
+  const s: Session = {
+    ...session,
+    step: "esperar_documentos",
+    lead: { ...(session.lead || LEAD_EMPTY), incomeSource: source },
+  };
+  const docs = requestedDocuments(s)
+    .map((doc) => `- ${doc}`)
+    .join("\n");
+  return {
+    actions: [
+      actionTexto(
+        `Para enviar tu expediente a *${session.targetBank}*, subi por este chat:\n${docs}\n\n` +
+          "Cuando los recibamos, te pedire autorizacion para el estudio inicial gratuito de PreCali.",
+      ),
+    ],
+    session: s,
+  };
+}
+
+async function stepEsperarDocumentos({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  if (!String(bodyText || "").startsWith("[DOCUMENTO_RECIBIDO]")) {
+    const docs = requestedDocuments(session)
+      .map((doc) => `- ${doc}`)
+      .join("\n");
+    return { actions: [actionTexto(`Aun necesito que subas los documentos por este chat:\n${docs}`)], session };
+  }
+
+  const documentText = String(bodyText).replace("[DOCUMENTO_RECIBIDO]", "").trim();
+  const s: Session = { ...session, step: "autorizar_soft_precali", documentText };
+  return {
+    actions: [
+      actionBotones("Recibi tus documentos. Para que PreCali realice el estudio crediticio inicial gratuito y cruce los datos, necesito tu autorizacion. Autorizas?", [
+        { id: "soft_precali_si", title: "Si autorizo" },
+        { id: "duda", title: "Tengo duda" },
+        { id: "soft_precali_no", title: "Ahora no" },
+      ]),
+    ],
+    session: s,
+  };
+}
+
+async function stepAutorizarSoftPreCali({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  if (buttonPayload === "soft_precali_si" || /^(si|autorizo|acepto|dale)$/i.test(normalize(bodyText))) {
+    const summary = extractDocumentSummary(session.documentText);
+    const s: Session = { ...session, step: "confirmar_datos_extraidos", extractedSummary: summary };
+    return {
+      actions: [
+        actionBotones(`Estudio inicial PreCali listo.\n${summary}\n\nConfirmas que estos datos son correctos?`, [
+          { id: "datos_ok", title: "Correcto" },
+          { id: "datos_corregir", title: "Corregir" },
+          { id: "duda", title: "Tengo duda" },
+        ]),
+      ],
+      session: s,
+    };
+  }
+  if (buttonPayload === "soft_precali_no" || /^(no|ahora no|luego)$/i.test(normalize(bodyText))) {
+    return { actions: [actionTexto("De acuerdo. No realizaremos el estudio inicial sin tu autorizacion.")], session: { ...session, step: "pausado" } };
+  }
+  const { message, aiHistory } = await manejarDuda({ session, userText: bodyText || "(sin texto)" });
+  return { actions: [actionTexto(message), redisplayStep(session)[0]], session: { ...session, aiHistory } };
+}
+
+async function stepConfirmarDatosExtraidos({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  if (buttonPayload === "datos_ok" || /^(si|correcto|ok|esta bien)$/i.test(normalize(bodyText))) {
+    return goToHardPull(session, session.targetBank || "");
+  }
+  if (buttonPayload === "datos_corregir") {
+    return { actions: [actionTexto("Indica la correccion en un solo mensaje. La agregare como nota antes de enviarlo al banco.")], session: { ...session, step: "corregir_datos_extraidos" } };
+  }
+  const { message, aiHistory } = await manejarDuda({ session, userText: bodyText || "(sin texto)" });
+  return { actions: [actionTexto(message), redisplayStep(session)[0]], session: { ...session, aiHistory } };
+}
+
+async function stepCorregirDatosExtraidos({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  const s: Session = { ...session, correctionNote: String(bodyText || "").trim(), step: "confirmar_datos_extraidos" };
+  return {
+    actions: [
+      actionBotones("Correccion registrada. Confirmas que ya podemos continuar con la autorizacion bancaria?", [
+        { id: "datos_ok", title: "Continuar" },
+        { id: "datos_corregir", title: "Corregir mas" },
+        { id: "duda", title: "Tengo duda" },
+      ]),
+    ],
+    session: s,
+  };
+}
+
+function goToHardPull(session: Session, bankName: string): HandleIncomingResult {
+  const s: Session = { ...session, step: "confirmar_hard_pull", targetBank: bankName };
+  const body =
+    `Para enviar tu expediente completo a *${bankName}* y que ellos realicen el estudio oficial de aprobacion, ` +
+    `responde *Autorizo al banco*.`;
+  return {
+    actions: [
+      actionBotones(body, [
+        { id: "hard_si", title: "Autorizo banco" },
+        { id: "duda", title: "Tengo duda" },
+        { id: "hard_no", title: "Ahora no" },
+      ]),
+    ],
+    session: s,
+  };
+}
+
+async function stepConfirmarHardPull({
+  session,
+  buttonPayload,
+  bodyText,
+}: {
+  session: Session;
+  buttonPayload: string | undefined;
+  bodyText: string;
+}): Promise<HandleIncomingResult> {
+  if (buttonPayload === "hard_si" || /autorizo al banco|autorizo banco|si autorizo|acepto/i.test(normalize(bodyText))) {
+    const s: Session = { ...session, step: "aplicado" };
+    return {
+      actions: [
+        actionTexto(`Listo. Tu expediente quedo autorizado para *${session.targetBank}*.\n` + "Te mantendremos actualizado por este chat sobre la solicitud."),
+      ],
+      session: s,
+    };
+  }
+  if (buttonPayload === "hard_no" || /^(no|ahora no|luego)$/i.test(normalize(bodyText))) {
+    return { actions: [actionTexto("Entendido. No enviaremos tu expediente al banco sin autorizacion.")], session: { ...session, step: "pausado" } };
+  }
+  const { message, aiHistory } = await manejarDuda({ session, userText: bodyText || "(sin texto)" });
+  return { actions: [actionTexto(message), redisplayStep(session)[0]], session: { ...session, aiHistory } };
+}
+
+async function stepLibre({ session, bodyText }: { session: Session; bodyText: string }): Promise<HandleIncomingResult> {
+  if (isResetCommand(bodyText)) return start({ ...session, step: "inicio" });
+  const { message, aiHistory } = await manejarDuda({ session, userText: bodyText || "(sin texto)" });
+  return { actions: [actionTexto(message)], session: { ...session, aiHistory } };
+}
+
+function redisplayStep(session: Session): Action[] {
+  switch (session.step) {
+    case "pedir_producto":
+      return [actionListaProducto()];
+    case "pedir_ingreso":
+      return [actionTexto("Necesito tu ingreso neto mensual exacto.")];
+    case "pedir_deudas":
+      return [actionTexto("Necesito el total exacto de tus deudas mensuales. Si no tenes, escribi 0.")];
+    case "pedir_prima":
+      return [actionTexto("Necesito la prima o enganche exacto. Si no tenes, escribi 0.")];
+    case "post_resultado":
+      return [postResultActions()];
+    case "elegir_banco_aplicar":
+      return [actionBotones("A que banco queres aplicar?", topBankOptions(session))];
+    case "elegir_banco_requisitos":
+      return [actionBotones("De que banco queres ver requisitos?", topBankOptions(session))];
+    case "lead_datos":
+      return [actionTexto("Enviame nombre completo, cedula o identificacion y correo electronico en un solo mensaje.")];
+    case "lead_fuente_ingresos":
+      return [
+        actionBotones("Cual es tu fuente principal de ingresos?", [
+          { id: "asalariado", title: "Asalariado" },
+          { id: "independiente", title: "Independiente" },
+          { id: "duda", title: "Tengo duda" },
+        ]),
+      ];
+    case "esperar_documentos":
+      return [actionTexto("Subi los documentos solicitados por este chat para continuar.")];
+    case "autorizar_soft_precali":
+      return [
+        actionBotones("Autorizas el estudio crediticio inicial gratuito de PreCali?", [
+          { id: "soft_precali_si", title: "Si autorizo" },
+          { id: "duda", title: "Tengo duda" },
+          { id: "soft_precali_no", title: "Ahora no" },
+        ]),
+      ];
+    case "confirmar_datos_extraidos":
+      return [
+        actionBotones("Confirmas que los datos extraidos son correctos?", [
+          { id: "datos_ok", title: "Correcto" },
+          { id: "datos_corregir", title: "Corregir" },
+          { id: "duda", title: "Tengo duda" },
+        ]),
+      ];
+    case "confirmar_hard_pull":
+      return [
+        actionBotones(`Para enviar tu expediente a *${session.targetBank}*, responde *Autorizo al banco*.`, [
+          { id: "hard_si", title: "Autorizo banco" },
+          { id: "duda", title: "Tengo duda" },
+          { id: "hard_no", title: "Ahora no" },
+        ]),
+      ];
+    default:
+      return [actionListaProducto()];
+  }
+}
+
+// ---------- Entrada principal ----------
+
+export async function handleIncoming(input: IncomingMessage): Promise<HandleIncomingResult> {
+  const session: Session = input.session || ({} as Session);
+  const bodyText = input.bodyText;
+  const buttonText = input.buttonText;
+  const defaultCountry: PaisId = input.defaultCountry;
+  let buttonPayload: string | undefined = coerceButtonPayload(session, input.buttonPayload, bodyText || buttonText);
+  if (isResetCommand(bodyText) && !buttonPayload && session.step !== "inicio") {
+    return start({ ...session, step: "inicio" });
+  }
+
+  switch (session.step) {
+    case "inicio":
+      if (bodyText && !isResetCommand(bodyText)) {
+        return stepPedirProducto({ session: { ...session, step: "pedir_producto" }, buttonPayload, bodyText, defaultCountry });
+      }
+      return start(session);
+    case "pedir_producto":
+      return stepPedirProducto({ session, buttonPayload, bodyText, defaultCountry });
+    case "pedir_ingreso":
+      return stepPedirIngreso({ session, bodyText });
+    case "pedir_deudas":
+      return stepPedirDeudas({ session, bodyText });
+    case "pedir_prima":
+      return stepPedirPrima({ session, bodyText });
+    case "post_resultado":
+      return stepPostResultado({ session, buttonPayload, bodyText });
+    case "elegir_banco_aplicar":
+      return stepElegirBancoAplicar({ session, buttonPayload, bodyText });
+    case "elegir_banco_requisitos":
+      return stepElegirBancoRequisitos({ session, buttonPayload, bodyText });
+    case "lead_datos":
+      return stepLeadDatos({ session, bodyText });
+    case "lead_fuente_ingresos":
+      return stepLeadFuenteIngresos({ session, buttonPayload, bodyText });
+    case "esperar_documentos":
+      return stepEsperarDocumentos({ session, bodyText });
+    case "autorizar_soft_precali":
+      return stepAutorizarSoftPreCali({ session, buttonPayload, bodyText });
+    case "confirmar_datos_extraidos":
+      return stepConfirmarDatosExtraidos({ session, buttonPayload, bodyText });
+    case "corregir_datos_extraidos":
+      return stepCorregirDatosExtraidos({ session, bodyText });
+    case "confirmar_hard_pull":
+      return stepConfirmarHardPull({ session, buttonPayload, bodyText });
+    case "aplicado":
+    case "pausado":
+      return stepLibre({ session, bodyText });
+    default:
+      return start(session);
+  }
+}
+
+export { redisplayStep, manejarDuda };

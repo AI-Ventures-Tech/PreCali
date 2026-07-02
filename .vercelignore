@@ -1,7 +1,0 @@
-.vercel
-node_modules
-*.log
-*.zip
-.DS_Store
-Thumbs.db
-__MACOSX
