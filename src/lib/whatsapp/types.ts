@@ -2,6 +2,7 @@
 // Port fiel de api/_lib/precali-memory.js (Session/Profile/Lead) y precali-flow.js (Action).
 
 import type { PaisId } from "@/types/precali";
+import type { EngineResult } from "@/types/buro";
 
 export const SESSION_VERSION = 2 as const;
 
@@ -50,6 +51,7 @@ export interface Session {
   lastResults: unknown | null;
   targetBank: string | null;
   lead: Lead;
+  buroResult: EngineResult | null;
   documentText: string;
   extractedSummary: string;
   correctionNote: string;

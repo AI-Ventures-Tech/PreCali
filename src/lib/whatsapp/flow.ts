@@ -23,6 +23,8 @@ import {
 import { calcularPrecalificacion, consultarRequisitos, type CalcularResult, type CalcOpcion } from "@/lib/whatsapp/tools";
 import { resolverDuda, type ChatMessage } from "@/lib/whatsapp/agent";
 import { analyzeWithPreCaliAi, type NormalizedAiResult } from "@/lib/whatsapp/ai";
+import { generateMockBuroResponse } from "@/lib/buro/mock-equifax";
+import { calificarLead } from "@/lib/buro/engine";
 
 const DEFAULT_CURRENCY: Record<string, string> = { CR: "CRC" };
 const COUNTRY_CURRENCIES: Record<string, string[]> = {
@@ -404,7 +406,12 @@ async function manejarDuda({ session, userText }: { session: Session; userText: 
   const result = await resolverDuda({
     aiHistory: session.aiHistory as ChatMessage[] | undefined,
     userText,
-    context: { country: session.profile.country, step: session.step, profile: session.profile },
+    context: {
+      country: session.profile.country,
+      step: session.step,
+      profile: session.profile,
+      nivelRiesgo: session.buroResult?.nivel ?? null,
+    },
   });
   return { message: result.message, aiHistory: result.aiHistory };
 }
@@ -714,7 +721,8 @@ function goToLeadCapture(session: Session, bankName: string): HandleIncomingResu
       actionTexto(
         `Para preparar tu expediente para *${bankName}*, necesito estos datos en un solo mensaje:\n` +
           "Nombre completo\nCedula o identificacion\nCorreo electronico\n\n" +
-          "El telefono sera el mismo desde el que escribiste, salvo que indiques otro.",
+          "El telefono sera el mismo desde el que escribiste, salvo que indiques otro.\n\n" +
+          "Al enviarnos tu cedula autorizas a PreCali a consultar tu perfil crediticio con fines de precalificacion.",
       ),
     ],
     session: s,
@@ -731,10 +739,14 @@ async function stepLeadDatos({ session, bodyText }: { session: Session; bodyText
     return { actions: [actionTexto(`Me falta: ${missing.join(", ")}.\nEnviamelo en un solo mensaje para continuar.`)], session };
   }
 
+  const buro = generateMockBuroResponse(parsed.idNumber, new Date().toISOString());
+  const buroResult = calificarLead(buro, session.profile);
+
   const s: Session = {
     ...session,
     step: "lead_fuente_ingresos",
     lead: { ...(session.lead || LEAD_EMPTY), ...parsed },
+    buroResult,
   };
   return {
     actions: [
@@ -879,20 +891,36 @@ async function stepCorregirDatosExtraidos({ session, bodyText }: { session: Sess
 }
 
 function goToHardPull(session: Session, bankName: string): HandleIncomingResult {
+  if (session.buroResult?.nivel === 1) {
+    return {
+      actions: [
+        actionTexto(
+          "Con tu perfil crediticio actual, un banco tradicional muy probablemente no te aprobaria todavia. " +
+            "En vez de enviar tu expediente, te propongo una guia para sanear tu historial en los proximos 6 meses " +
+            "y volver a intentar con mejores condiciones. Cuando quieras retomar el tramite bancario, escribime.",
+        ),
+      ],
+      session: { ...session, step: "pausado" },
+    };
+  }
+
   const s: Session = { ...session, step: "confirmar_hard_pull", targetBank: bankName };
+  return { actions: [hardPullPrompt(s)], session: s };
+}
+
+function hardPullPrompt(session: Session): Action {
+  const ajusteNota =
+    session.buroResult?.nivel === 2
+      ? "\n\nPor tu perfil, lo mas probable es que este banco pida una prima (enganche) mayor o un ajuste en el monto solicitado."
+      : "";
   const body =
-    `Para enviar tu expediente completo a *${bankName}* y que ellos realicen el estudio oficial de aprobacion, ` +
-    `responde *Autorizo al banco*.`;
-  return {
-    actions: [
-      actionBotones(body, [
-        { id: "hard_si", title: "Autorizo banco" },
-        { id: "duda", title: "Tengo duda" },
-        { id: "hard_no", title: "Ahora no" },
-      ]),
-    ],
-    session: s,
-  };
+    `Para enviar tu expediente completo a *${session.targetBank}* y que ellos realicen el estudio oficial de aprobacion, ` +
+    `responde *Autorizo al banco*.${ajusteNota}`;
+  return actionBotones(body, [
+    { id: "hard_si", title: "Autorizo banco" },
+    { id: "duda", title: "Tengo duda" },
+    { id: "hard_no", title: "Ahora no" },
+  ]);
 }
 
 async function stepConfirmarHardPull({
@@ -971,13 +999,7 @@ function redisplayStep(session: Session): Action[] {
         ]),
       ];
     case "confirmar_hard_pull":
-      return [
-        actionBotones(`Para enviar tu expediente a *${session.targetBank}*, responde *Autorizo al banco*.`, [
-          { id: "hard_si", title: "Autorizo banco" },
-          { id: "duda", title: "Tengo duda" },
-          { id: "hard_no", title: "Ahora no" },
-        ]),
-      ];
+      return [hardPullPrompt(session)];
     default:
       return [actionListaProducto()];
   }

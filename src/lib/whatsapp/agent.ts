@@ -48,6 +48,11 @@ export interface ResolverDudaContext {
   country: string;
   step: string;
   profile: object;
+  // Nivel de riesgo del motor calificador (1/2/3), o null/undefined si todavia
+  // no se hizo la consulta de buro. Solo se usa este numero para modular el
+  // tono: nunca pasar aca el score, categoriaSugef ni el resto del payload
+  // del buro (CWE-200, dato financiero simulado sensible).
+  nivelRiesgo?: 1 | 2 | 3 | null;
 }
 
 export interface ResolverDudaResult {
@@ -77,7 +82,24 @@ TONO
 CONTEXTO ACTUAL DE LA PERSONA
 - Pais: {{COUNTRY}}
 - Paso actual del flujo guiado: {{STEP}}
-- Perfil ya conocido: {{PROFILE_JSON}}`;
+- Perfil ya conocido: {{PROFILE_JSON}}
+{{NIVEL_RIESGO}}`;
+
+// Modula el tono segun el nivel de riesgo del motor calificador (1/2/3).
+// SEGURIDAD: solo consume el numero de nivel. Nunca interpolar aca el score,
+// categoriaSugef, operaciones ni ningun otro campo del buro (CWE-200).
+function nivelRiesgoInstruccion(nivel: ResolverDudaContext["nivelRiesgo"]): string {
+  switch (nivel) {
+    case 1:
+      return "- Nivel de riesgo: 1 (alto riesgo). No vendas productos bancarios ni empujes a aplicar a ningun banco: rol educativo y empatico, guiando un plan de saneamiento crediticio a 6 meses.";
+    case 2:
+      return "- Nivel de riesgo: 2 (riesgo medio). Aclara que las ofertas van a requerir mayor prima/enganche o ajuste de monto, y prioriza cooperativas/financieras con mas apetito de riesgo sobre bancos tradicionales exigentes.";
+    case 3:
+      return "- Nivel de riesgo: 3 (cliente prime). Modo de conversion rapida: prioriza las mejores tasas y los bancos lideres.";
+    default:
+      return "";
+  }
+}
 
 function hasGroqKey(): boolean {
   return Boolean(getEnv().GROQ_API_KEY);
@@ -87,11 +109,12 @@ function isDisabled(): boolean {
   return getEnv().PRECALI_AI_DISABLED === "1";
 }
 
-function buildSystemPrompt(context: ResolverDudaContext | null | undefined): string {
+export function buildSystemPrompt(context: ResolverDudaContext | null | undefined): string {
   const c = context || ({} as ResolverDudaContext);
   return SYSTEM_PROMPT_TEMPLATE.replace("{{COUNTRY}}", c.country || "no identificado")
     .replace("{{STEP}}", c.step || "inicio")
-    .replace("{{PROFILE_JSON}}", JSON.stringify(c.profile || {}));
+    .replace("{{PROFILE_JSON}}", JSON.stringify(c.profile || {}))
+    .replace("{{NIVEL_RIESGO}}", nivelRiesgoInstruccion(c.nivelRiesgo));
 }
 
 function safeJsonParse(value: string | null | undefined): unknown {
