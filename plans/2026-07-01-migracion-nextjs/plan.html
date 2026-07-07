@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plan: PreCali / Migración a Next.js</title>
+<style>
+  :root{
+    --bg:#0f1411; --panel:#16201b; --panel-2:#1d2a23; --ink:#e8efea; --muted:#9bb0a4;
+    --brand:#1F4D3F; --brand-2:#2f6b58; --accent:#9fe8c9; --line:#28382f;
+    --todo:#6b8278; --progress:#e0a23b; --done:#4caf7d; --block:#d96666;
+    --tier-cheap:#5a7d8c; --tier-mid:#6c7a3a; --tier-hard:#9a4b6b; --tier-batch:#7a5a2a;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0c110e 0,var(--bg) 220px);color:var(--ink);
+    font:15px/1.6 "Segoe UI",system-ui,-apple-system,Open Sans,sans-serif;}
+  header.plan{background:linear-gradient(120deg,var(--brand) 0,#16352b 100%);padding:34px 28px;
+    border-bottom:1px solid var(--line);}
+  header.plan .kicker{color:var(--accent);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+  header.plan h1{margin:.3em 0 0;font-family:Georgia,Fraunces,serif;font-size:30px;font-weight:600;letter-spacing:-.01em}
+  header.plan .sub{color:#cfe2d8;margin-top:8px;max-width:760px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);padding:4px 10px;border-radius:999px;font-size:12px}
+  .chip b{color:var(--accent)}
+  main{max-width:1000px;margin:0 auto;padding:26px 22px 80px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0}
+  h2{margin:.1em 0 .6em;font-size:18px;color:#dff3e8;border-bottom:1px solid var(--line);padding-bottom:10px}
+  h3{margin:1.4em 0 .5em;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  p,li{color:#d4e0d7}
+  .note{background:#0f1714;border-left:3px solid var(--brand-2);padding:10px 14px;border-radius:0 8px 8px 0;color:var(--muted);font-size:13px}
+  ul{padding-left:1.1em}
+  code{background:#0e1714;padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--accent);font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+  pre{background:#0c1310;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow:auto}
+  pre code{background:none;padding:0;color:#cfe6da;font-size:12.5px;line-height:1.55}
+  .kw{color:#7fd1b0} .ty{color:#9ec5ff} .fn{color:#e0c07a} .co{color:#6f867b}
+  /* Subtasks */
+  .st{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}
+  .st .box{width:20px;height:20px;border-radius:5px;border:2px solid var(--todo);margin-top:2px}
+  .st.s-todo .box{border-color:var(--todo)} .st.s-progress .box{background:var(--progress);border-color:var(--progress)}
+  .st.s-done .box{background:var(--done);border-color:var(--done)} .st.s-block .box{background:var(--block);border-color:var(--block)}
+  .st .head{font-weight:600} .st .id{color:var(--accent);font-weight:700;margin-right:6px}
+  .st .desc{color:#c5d4c9;font-size:13.5px;margin-top:2px}
+  .st .verify{color:var(--muted);font-size:12px;margin-top:6px;font-family:"IBM Plex Mono",monospace}
+  .st .tags{display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:11px}
+  .tag{padding:2px 8px;border-radius:999px;font-weight:700;letter-spacing:.03em}
+  .t-cheap{background:rgba(90,125,140,.22);color:#9fc4d1;border:1px solid #2f4a52}
+  .t-mid{background:rgba(108,122,58,.22);color:#c6d388;border:1px solid #3d4a23}
+  .t-hard{background:rgba(154,75,107,.22);color:#e39bb6;border:1px solid #5a2a3d}
+  .t-batch{background:rgba(122,90,42,.22);color:#e0bb83;border:1px solid #4a3618}
+  .needs{background:rgba(159,232,201,.10);color:var(--accent);border:1px solid #2a4a3e}
+  .phase{margin-top:30px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:6px 0 4px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+  /* Invariants */
+  .inv{background:#0f1714;border-left:3px solid #9a4b6b;padding:10px 14px;border-radius:0 8px 8px 0;margin:7px 0;font-size:13.5px}
+  .inv b{color:#e39bb6}
+  /* Questions form */
+  fieldset.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;background:var(--panel-2)}
+  fieldset.q legend{font-weight:700;color:var(--accent);padding:0 8px}
+  fieldset.q label{display:block;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13.5px}
+  fieldset.q label:hover{background:rgba(255,255,255,.04)}
+  fieldset.q .rec{color:var(--accent);font-size:11px;font-weight:700;margin-left:4px}
+  fieldset.q textarea{width:100%;margin-top:8px;background:#0c1310;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  .notes-wrap{margin-top:14px}
+  .verdict{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .verdict label{flex:1;min-width:120px;text-align:center;background:#0f1714;border:1px solid var(--line);padding:9px;border-radius:8px;cursor:pointer;font-size:13px}
+  .verdict input{display:none}
+  .verdict input:checked + span{color:var(--accent);font-weight:700}
+  .actions{position:sticky;bottom:0;background:linear-gradient(0deg,var(--bg) 60%,transparent);padding:16px 0;margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button.gen{background:var(--brand-2);color:#fff;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:14px}
+  button.gen:hover{background:#388070}
+  #out{width:100%;min-height:120px;background:#0c1310;color:#cfe6da;border:1px dashed var(--line);border-radius:10px;padding:10px;font:12.5px/1.5 "IBM Plex Mono",monospace;display:none}
+  .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+  .footer-note a{color:var(--accent)}
+  @media(max-width:640px){ .st{grid-template-columns:22px 1fr} .st .tags{flex-direction:row;justify-content:flex-start} }
+</style>
+</head>
+<body>
+
+<header class="plan">
+  <div class="kicker">Plan de migración · /spec · status: <b style="color:#fff">DRAFT</b></div>
+  <h1>PreCali → Next.js</h1>
+  <div class="sub">Migración completa del sitio estático (HTML/CSS/JS) y del bot de WhatsApp (Vercel Serverless) a Next.js 15 App Router + React 19 + TypeScript + Tailwind 4.</div>
+  <div class="meta">
+    <span class="chip">Proyecto: <b>PreCali</b></span>
+    <span class="chip">Creado: <b>2026-07-01</b></span>
+    <span class="chip">Subtareas: <b>17</b></span>
+    <span class="chip">Fases: <b>A · B · C · D</b></span>
+    <span class="chip">Stack: <b>TS · App Router · React 19 · Tailwind 4</b></span>
+  </div>
+</header>
+
+<main>
+
+  <section>
+    <h2>Contexto</h2>
+    <p>PreCali hoy es un sitio <b>estático sin build</b>: <code>index.html</code> + <code>styles.css</code> (57&nbsp;KB) + 4 JS tipo IIFE que comparten estado por <b>globales</b> (<code>PAISES</code>, <code>BANCOS</code>, <code>TIPO_CAMBIO_USD</code>) y exponen handlers en <code>window.</code> para <code>onclick</code> inline.</p>
+    <p>Además existe un <b>bot de WhatsApp</b> en <code>api/</code> como Vercel Serverless (CommonJS, ≈3700 LOC en <code>api/_lib/</code>) que usa ~20 variables de entorno (Twilio, Groq, OpenAI, Upstash KV).</p>
+    <div class="note"><b>Hallazgos clave:</b> no hay <code>package.json</code> ni tests ni TS · el <b>lead form está roto</b> (posti­fica a <code>/</code> con el patrón Netlify Forms, que no funciona en Vercel) · <code>vercel.json</code> define cabeceras a migrar · solo Costa Rica está operativo.</div>
+    <h3>Decisiones aprobadas</h3>
+    <ul>
+      <li><b>1.</b> Migración completa: frontend + reescritura del bot a Route Handlers.</li>
+      <li><b>2.</b> Stack TS + App Router + React 19 + Tailwind 4, preservando la estética original.</li>
+      <li><b>3.</b> Lead → Route Handler (zod + anti-spam); data → módulos TS tipados.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Invariantes de seguridad</h2>
+    <div class="inv"><b>CWE-79</b> — Ningún input de usuario/WhatsApp se renderiza sin escape. Se prohíbe <code>dangerouslySetInnerHTML</code> salvo con sanitización.</div>
+    <div class="inv"><b>CWE-306</b> — El webhook de WhatsApp <b>verifica la firma <code>X-Twilio-Signature</code></b> antes de procesar; si no coincide → 403 sin side effects.</div>
+    <div class="inv"><b>CWE-770/799</b> — El endpoint de leads aplica <b>honeypot + rate-limit por IP</b> y rechaza payloads fuera del schema zod.</div>
+    <div class="inv"><b>CWE-601/918</b> — Las URLs/medios de Twilio se validan contra allowlist de dominios antes de cualquier fetch (sin SSRF/open redirect).</div>
+    <div class="inv"><b>CWE-89</b> — Los accesos a Upstash KV usan el SDK oficial; nunca concatenación de strings para claves.</div>
+    <div class="inv"><b>CWE-532</b> — Ningún secreto se loguea ni se envía al cliente; el código que los toca vive bajo <code>src/lib/**</code>.</div>
+    <div class="inv"><b>CWE-22</b> — Los paths temporales de OCR se validan dentro de <code>tmpdir()</code> sin <code>..</code>.</div>
+  </section>
+
+  <section>
+    <h2>Signatures (interfaces)</h2>
+    <p>Declaradas antes que cualquier implementación. Cada una etiquetada <code>[new]</code> / <code>[adapt]</code> / <code>[reuse]</code> y su archivo destino.</p>
+    <h3>Dominio</h3>
+    <pre><code><span class="kw">export type</span> <span class="ty">PaisId</span> = <span class="co">'cr' | 'mx' | 'gt' | 'sv' | 'hn' | 'ni' | 'pa'</span>;
+<span class="kw">export interface</span> <span class="ty">Pais</span> { id: <span class="ty">PaisId</span>; nombre: <span class="ty">string</span>; bandera: <span class="ty">string</span>; moneda: <span class="ty">string</span>; simbolo: <span class="ty">string</span>; cambioUSD: <span class="ty">number</span>; ... }
+<span class="kw">export interface</span> <span class="ty">Banco</span> { id; nombre; color; iniciales; tipo: <span class="co">'Público'|'Privado'</span>; personal; vehiculo; hipoteca: <span class="ty">CondicionPrestamo</span>; }
+<span class="co">// src/types/precali.ts [new]</span></code></pre>
+    <h3>Route Handlers</h3>
+    <pre><code><span class="co">// src/app/api/lead/route.ts [new]</span>
+<span class="kw">export async function</span> <span class="fn">POST</span>(req: <span class="ty">Request</span>): <span class="ty">Promise</span>&lt;<span class="ty">Response</span>&gt;   <span class="co">// 200 | 400 | 429</span>
+<span class="co">// src/app/api/whatsapp/precali/route.ts [new]</span>
+<span class="kw">export async function</span> <span class="fn">POST</span>(req: <span class="ty">Request</span>): <span class="ty">Promise</span>&lt;<span class="ty">Response</span>&gt;   <span class="co">// text/xml TwiML; 200 siempre</span></code></pre>
+    <h3>Hooks &amp; server lib</h3>
+    <pre><code><span class="kw">export function</span> <span class="fn">useCalculadoraCredito</span>(): { pais; cambiarPais; calcular; seleccion; ... }   <span class="co">// src/hooks/ [new]</span>
+<span class="kw">export async function</span> <span class="fn">handleIncoming</span>(input): <span class="ty">Promise</span>&lt;{ actions; session }&gt;        <span class="co">// src/lib/whatsapp/ [adapt]</span>
+<span class="kw">export function</span> <span class="fn">getEnv</span>(): <span class="ty">PrecaliEnv</span>                                              <span class="co">// src/lib/env.ts [new]</span></code></pre>
+  </section>
+
+  <section>
+    <h2>Subtareas</h2>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--todo)"></span>todo</span>
+      <span><span class="swatch" style="background:var(--progress)"></span>en progreso</span>
+      <span><span class="swatch" style="background:var(--done)"></span>done</span>
+      <span><span class="swatch" style="background:var(--block)"></span>bloqueada</span>
+      <span style="margin-left:auto"><span class="tag t-cheap">cheap</span> <span class="tag t-mid">mid</span> <span class="tag t-hard">hard</span> <span class="tag t-batch">batch</span></span>
+    </div>
+
+    <h3 class="phase">Fase A — Fundación</h3>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S1</span>Bootstrap Next.js 15 + React 19 + TS + Tailwind 4</div><div class="desc"><code>package.json</code>, <code>tsconfig</code> strict, <code>next.config.ts</code>, layout raíz, <code>.env.example</code> (~20 vars), assets a <code>public/</code>.</div><div class="verify">verify: npm run dev (200 en /) · npx tsc --noEmit</div></div><div class="tags"><span class="tag t-mid">mid</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S2</span>Design tokens → Tailwind 4 (<code>@theme</code>)</div><div class="desc">Portear <code>:root</code> CSS, <code>#1F4D3F</code>, 4 fuentes vía <code>next/font</code>, animaciones base.</div><div class="verify">verify: npm run build · must_include: @theme · needs: S1</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S1</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S3</span>Tipar y portear la data</div><div class="desc"><code>data.js</code> → <code>src/data/*.ts</code>, tipos en <code>src/types/precali.ts</code>. Datos de CR idénticos.</div><div class="verify">verify: tsc --noEmit · test: data.test.ts · needs: S1</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S1</span></div></div>
+
+    <h3 class="phase">Fase B — Frontend</h3>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S4</span>Layout y componentes shell</div><div class="desc">Header/nav, footer, scroll-progress, back-to-top, country-select, <code>&lt;ModalHost&gt;</code> portal. Sin <code>onclick</code> inline.</div><div class="verify">verify: build · must_not_include: onclick= · needs: S1,S2</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S1,S2</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S5</span>Secciones estáticas del home</div><div class="desc">Hero (orbit), metodología, contacto, avisos legales desde <code>AVISOS_LEGALES</code>.</div><div class="verify">verify: build · test: render H1 · needs: S4,S3</div></div><div class="tags"><span class="tag t-cheap">cheap</span><span class="tag needs">needs S4,S3</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S6</span>Calculadora de créditos</div><div class="desc">Portear <code>app.js</code> (cuota/monto, ratio, USD↔CRC, orden) a hook + componentes + count-up.</div><div class="verify">verify: build · test: cuota conocida · needs: S4,S3</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S4,S3</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S7</span>Comparador de seguros</div><div class="desc">Portear <code>seguros.js</code> (auto/vida/salud) a hook + componentes.</div><div class="verify">verify: build · test: snapshot auto CR · needs: S4,S3</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S4,S3</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S8</span>Lead form + <code>POST /api/lead</code></div><div class="desc">zod + honeypot + rate-limit; reemplaza el <code>fetch('/')</code> roto.</div><div class="verify">verify: curl 200/400/429 · test: route.test.ts · needs: S4</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S4</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S9</span>Páginas legales</div><div class="desc"><code>/privacidad</code> y <code>/terminos</code> como Server Components, sin <code>.html</code>.</div><div class="verify">verify: GET 200 · needs: S4</div></div><div class="tags"><span class="tag t-cheap">cheap</span><span class="tag needs">needs S4</span></div></div>
+
+    <h3 class="phase">Fase C — Backend WhatsApp</h3>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S10</span><code>src/lib/env.ts</code> + scaffold server</div><div class="desc">Env tipado + flags; tipos <code>Session</code>, <code>Action</code>; barrer las ~20 vars.</div><div class="verify">verify: tsc --noEmit · needs: S1</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S1</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S11</span>Memoria/estado (Upstash KV)</div><div class="desc"><code>precali-memory.js</code> → <code>memory.ts</code> con <code>@upstash/redis</code>.</div><div class="verify">verify: tsc --noEmit · needs: S10</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S10</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S12</span>Twilio + content templates + media</div><div class="desc">Portear envío de mensajes, quick replies, fetch de media.</div><div class="verify">verify: tsc --noEmit · needs: S10</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S10</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S13</span>IA / OCR / documentos</div><div class="desc">OpenAI + Groq (visión), fallback OCR, validación de dominios (SSRF).</div><div class="verify">verify: tsc --noEmit · test: parseo doc · needs: S10</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S10</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S14</span>Flow / agente / bot</div><div class="desc">Portear <code>precali-flow/agent/whatsapp-bot/tools</code> → TS. <code>handleIncoming</code> y estado.</div><div class="verify">verify: tsc --noEmit · test: flow.test.ts · needs: S11,S12,S13</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S11,S12,S13</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S15</span>Route Handler del webhook</div><div class="desc"><code>POST /api/whatsapp/precali</code>, parseo Twilio, <b>verify firma</b>, TwiML. 200 siempre.</div><div class="verify">verify: curl firma inválida → 403 · test: route.test.ts · needs: S14</div></div><div class="tags"><span class="tag t-hard">hard</span><span class="tag needs">needs S14</span></div></div>
+
+    <h3 class="phase">Fase D — Integración y limpieza</h3>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S16</span>Migrar <code>vercel.json</code> → <code>next.config.ts</code></div><div class="desc">Cabeceras, cleanUrls, trailingSlash, metadata OG, favicons, robots.</div><div class="verify">verify: build · must_not_include: vercel.json · needs: S1</div></div><div class="tags"><span class="tag t-cheap">cheap</span><span class="tag needs">needs S1</span></div></div>
+    <div class="st s-todo"><div class="box"></div><div><div class="head"><span class="id">S17</span>Verde total + borrar legacy</div><div class="desc">typecheck + lint + build + test; eliminar <code>index.html</code>, <code>app.js</code>, <code>seguros.js</code>, <code>data*.js</code>, <code>styles.css</code>, <code>*.html</code>, <code>api/</code>.</div><div class="verify">verify: npm run typecheck && lint && build && test · needs: S5,S6,S7,S8,S9,S15,S16</div></div><div class="tags"><span class="tag t-mid">mid</span><span class="tag needs">needs S5..S16</span></div></div>
+  </section>
+
+  <section>
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Activar países regionales (mx/gt/sv/hn/ni/pa); solo <code>cr</code> queda operativo como hoy.</li>
+      <li>Cambiar la estética/branding (objetivo: preservar el look actual).</li>
+      <li>Persistencia real de leads en DB (queda como decisión en Q1).</li>
+      <li>Reentrenar prompts del agente IA (se portean tal cual).</li>
+      <li>E2E con Playwright; mover dominio / CI-CD.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Preguntas abiertas — responder para aprobar</h2>
+    <p class="note">Marca una opción por pregunta (la recomendada lleva <span class="rec">(rec)</span>), añade notas y un veredicto. El botón genera un bloque listo para pegar en el chat.</p>
+
+    <form id="qa">
+      <fieldset class="q">
+        <legend>Q1 — Persistencia de leads en <code>POST /api/lead</code></legend>
+        <label><input type="radio" name="q1" value="Solo log + email (empezar simple)" checked> Solo log + email <span class="rec">(rec)</span></label>
+        <label><input type="radio" name="q1" value="Log + email + Upstash KV"> Log + email + Upstash KV (lightweight)</label>
+        <label><input type="radio" name="q1" value="Hoja de cálculo / CRM"> Hoja de cálculo / CRM</label>
+        <textarea name="q1-other" rows="2" placeholder="Otra respuesta / matiz…"></textarea>
+      </fieldset>
+
+      <fieldset class="q">
+        <legend>Q2 — Rate-limit del lead</legend>
+        <label><input type="radio" name="q2" value="In-memory LRU (suficiente ahora)" checked> In-memory LRU (suficiente ahora) <span class="rec">(rec)</span></label>
+        <label><input type="radio" name="q2" value="Upstash Ratelimit"> Upstash Ratelimit (persistente, SDK extra)</label>
+        <textarea name="q2-other" rows="2" placeholder="Otra respuesta…"></textarea>
+      </fieldset>
+
+      <fieldset class="q">
+        <legend>Q3 — Estrategia de cutover del webhook de WhatsApp</legend>
+        <label><input type="radio" name="q3" value="Preview primero, cutover por webhook URL" checked> Preview primero, cutover por webhook URL <span class="rec">(rec)</span></label>
+        <label><input type="radio" name="q3" value="Cutover directo en /api/whatsapp/precali"> Cutover directo en la misma URL</label>
+        <textarea name="q3-other" rows="2" placeholder="Otra respuesta…"></textarea>
+      </fieldset>
+
+      <div class="notes-wrap">
+        <textarea id="notes" rows="3" placeholder="Notas generales / condiciones para aprobar…"></textarea>
+      </div>
+
+      <fieldset class="q" style="border-color:var(--brand-2)">
+        <legend>Veredicto</legend>
+        <div class="verdict">
+          <label><input type="radio" name="verdict" value="approve as-is"><span>Aprobar tal cual</span></label>
+          <label><input type="radio" name="verdict" value="approve with changes"><span>Aprobar con cambios</span></label>
+          <label><input type="radio" name="verdict" value="reject"><span>Rechazar</span></label>
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <button type="button" class="gen" id="gen">Generar respuestas</button>
+        <span style="color:var(--muted);font-size:12px">Copiado al portapapeles · pega en el chat</span>
+      </div>
+      <textarea id="out" readonly></textarea>
+    </form>
+  </section>
+
+  <div class="footer-note">
+    Vista generada desde <code>plan.md</code> (fuente de verdad). No editar a mano; regenerar con <code>/spec</code>.
+    Plan: <code>plans/2026-07-01-migracion-nextjs/plan.md</code>
+  </div>
+</main>
+
+<script>
+(function(){
+  var SLUG='2026-07-01-migracion-nextjs';
+  function val(name){var el=document.querySelector('input[name="'+name+'"]:checked');return el?el.value:'';}
+  function other(name){var t=document.querySelector('textarea[name="'+name+'-other"]');return t?t.value.trim():'';}
+  function qLine(id, label){
+    var v=val(id), o=other(id), ans=o || v || '(sin respuesta)';
+    return 'Q'+id+' ('+label+'): '+ans;
+  }
+  function build(){
+    var lines=[];
+    lines.push('Respuestas /spec — '+SLUG+':');
+    lines.push(qLine('1','persistencia leads'));
+    lines.push(qLine('2','rate-limit'));
+    lines.push(qLine('3','cutover webhook'));
+    var notes=document.getElementById('notes').value.trim();
+    lines.push('Notas: '+(notes||'(ninguna)'));
+    lines.push('Veredicto: '+(val('verdict')||'(sin veredicto)'));
+    return lines.join('\n');
+  }
+  document.getElementById('gen').addEventListener('click', function(){
+    var text=build();
+    var out=document.getElementById('out');
+    out.value=text; out.style.display='block';
+    var done=false;
+    function fallback(){var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done=true;},function(){fallback();});
+      } else { fallback(); }
+    }catch(e){ fallback(); }
+    setTimeout(function(){ if(!done) fallback(); }, 300);
+  });
+})();
+</script>
+</body>
+</html>

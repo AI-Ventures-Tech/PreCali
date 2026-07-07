@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arquitectura · Motor calificador con mock de buró · PreCali</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --surface:#ffffff; --surface-2:#efede6; --border:#e3e0d6; --track:#e7e4da;
+    --ink:#1b1b19; --ink-soft:#56534b; --ink-faint:#8b877a;
+    --accent:#2f6f6a; --accent-soft:#e2efed; --accent-line:#bcdcd8;
+    --done:#2e7d52; --done-bg:#e6f2ea;
+    --risk:#9a6400; --risk-bg:#fbf0db;
+    --error:#b3261e; --error-bg:#f8e4e2;
+    --info:#2b5aa8; --info-bg:#e7eefa;
+    --decision:#6b4ea3; --decision-bg:#efe9f8;
+    --shadow:0 1px 0 rgba(0,0,0,.02); --shadow-pop:0 12px 34px rgba(40,38,30,.17),0 2px 8px rgba(0,0,0,.05);
+    --radius:12px; --maxw:1180px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16161a; --surface:#1e1f25; --surface-2:#26272e; --border:#34353d; --track:#2c2d35;
+      --ink:#ecebe6; --ink-soft:#b3b1a9; --ink-faint:#86847d;
+      --accent:#6fd0c6; --accent-soft:#1f322f; --accent-line:#2c4d49;
+      --done:#62c98c; --done-bg:#16291f; --risk:#e0ad55; --risk-bg:#2c2415;
+      --error:#ef6b62; --error-bg:#2e1916; --info:#7aa6e8; --info-bg:#161f2e;
+      --decision:#b69ce6; --decision-bg:#221b30;
+      --shadow:0 1px 0 rgba(0,0,0,.25); --shadow-pop:0 14px 40px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.4);
+    }
+    .codeblock pre{background:#101116 !important; border:1px solid #2c2d35}
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth; font-size:106.25%}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:"Avenir Next","Avenir","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:1rem; line-height:1.62; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+  a{color:var(--accent); text-decoration:none} a:hover{text-decoration:underline}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.86em; background:var(--surface-2); padding:.1em .4em; border-radius:5px; word-break:break-word}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(16px,4vw,40px)}
+
+  header.hero{padding:clamp(26px,5vw,50px) 0 24px; border-bottom:1px solid var(--border)}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:.74rem; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:750}
+  .eyebrow::before{content:''; width:22px; height:2px; background:var(--accent); display:inline-block}
+  h1{font-size:clamp(1.8rem,4.8vw,2.9rem); line-height:1.1; margin:.3em 0 .12em; letter-spacing:-.012em; font-weight:720}
+  .tldr{font-size:clamp(1.05rem,2.4vw,1.34rem); line-height:1.4; color:var(--ink-soft); max-width:64ch; font-weight:430} .tldr b{color:var(--ink); font-weight:680}
+  .steps{display:flex; align-items:center; gap:0; margin:24px 0 4px; max-width:520px; flex-wrap:wrap}
+  .step{display:flex; align-items:center; gap:8px; font-size:.78rem; font-weight:650; color:var(--ink-faint)}
+  .step .dot{width:13px; height:13px; border-radius:50%; border:2px solid var(--track); background:var(--surface); flex:none}
+  .step.on{color:var(--accent)} .step.on .dot{background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
+  .step .bar{flex:1; height:2px; background:var(--track); margin:0 10px; min-width:26px} .step.on .bar{background:var(--accent)}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:10px; margin-top:26px}
+  .stat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .stat::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.5}
+  .stat.s-risk::before{background:var(--risk)} .stat.s-done::before{background:var(--done)} .stat.s-error::before{background:var(--error)}
+  .stat .n{display:block; font-size:1.9rem; line-height:1; font-weight:790; letter-spacing:-.03em; color:var(--ink)}
+  .stat .l{display:block; font-size:.74rem; color:var(--ink-faint); margin-top:5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+  .stat .h{display:inline-flex; align-items:center; gap:5px; font-size:1.02rem; font-weight:720; color:var(--done)}
+
+  .badge{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; font-weight:650; padding:4px 10px 4px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap}
+  .b-done{color:var(--done); background:var(--done-bg); border-color:color-mix(in srgb,var(--done) 30%,transparent)}
+  .b-risk{color:var(--risk); background:var(--risk-bg); border-color:color-mix(in srgb,var(--risk) 30%,transparent)}
+  .b-info{color:var(--info); background:var(--info-bg); border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+  .b-add{color:var(--done); background:var(--done-bg); border-color:color-mix(in srgb,var(--done) 30%,transparent)}
+  .b-mod{color:var(--info); background:var(--info-bg); border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+
+  .grid{display:grid; grid-template-columns:218px minmax(0,1fr); gap:clamp(22px,4vw,48px); padding:28px 0 90px; align-items:start}
+  nav.toc{position:sticky; top:18px; max-height:calc(100vh - 36px); overflow:auto; font-size:.86rem; padding-right:4px}
+  nav.toc .toc-h{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; margin:0 0 8px 12px}
+  nav.toc ol{list-style:none; margin:0; padding:0; border-left:2px solid var(--border)}
+  nav.toc li a{display:block; padding:5px 12px; color:var(--ink-soft); border-left:2px solid transparent; margin-left:-2px; line-height:1.3}
+  nav.toc li a:hover{color:var(--ink)}
+  nav.toc li a.here{color:var(--accent); border-left-color:var(--accent); font-weight:650; background:linear-gradient(90deg,var(--accent-soft),transparent)}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px}
+  .ctrl{font:inherit; font-size:.82rem; font-weight:600; color:var(--ink-soft); background:var(--surface); border:1px solid var(--border); padding:7px 13px; border-radius:8px; cursor:pointer}
+  .ctrl:hover{border-color:var(--accent); color:var(--accent)}
+
+  .timeline{position:relative}
+  .timeline::before{content:''; position:absolute; left:13px; top:12px; bottom:12px; width:2px; background:var(--border); z-index:0}
+  .node{position:relative; padding-left:44px; margin:0 0 16px}
+  .node-dot{position:absolute; left:3px; top:15px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.72rem; z-index:1; border:3px solid var(--bg); background:var(--surface)}
+  .d-info{color:var(--info); box-shadow:inset 0 0 0 2px var(--info)}
+  .d-build{color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent)}
+  .d-risk{color:var(--risk); box-shadow:inset 0 0 0 2px var(--risk)}
+  .d-done{color:var(--done); box-shadow:inset 0 0 0 2px var(--done)}
+  .d-decision{color:var(--decision); box-shadow:inset 0 0 0 2px var(--decision)}
+
+  section.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); scroll-margin-top:16px; box-shadow:var(--shadow)}
+  details{margin:0}
+  summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:13px; padding:15px 19px; user-select:none}
+  summary::-webkit-details-marker{display:none}
+  .chev{width:14px; height:14px; flex:none; color:var(--ink-faint); transition:transform .18s ease}
+  details[open] .chev{transform:rotate(90deg)}
+  .s-num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.05rem; font-weight:720; color:var(--ink-faint); flex:none; letter-spacing:-.02em; min-width:1.6em}
+  .s-title{font-size:1.08rem; font-weight:690; flex:1; min-width:0; letter-spacing:-.01em}
+  .s-tag{font-size:.74rem; color:var(--ink-faint); font-weight:600}
+  .body{padding:2px 19px 19px 19px; border-top:1px solid var(--border)}
+  .body > :first-child{margin-top:14px}
+  .body p{margin:.55em 0; color:var(--ink-soft)} .body strong{color:var(--ink)}
+  .body ul{margin:.4em 0; padding-left:1.25em} .body li{margin:.3em 0; color:var(--ink-soft)}
+  h3{font-size:.95rem; margin:1.3em 0 .3em; color:var(--ink); font-weight:690; letter-spacing:-.01em} h3:first-child{margin-top:.2em}
+
+  .callout{display:flex; gap:11px; align-items:flex-start; padding:12px 14px; border-radius:9px; margin:12px 0; font-size:.93rem; line-height:1.5}
+  .callout .gi{flex:none; margin-top:1px}
+  .c-info{background:var(--info-bg); color:var(--info)} .c-info b,.c-info strong{color:var(--info)}
+  .c-risk{background:var(--risk-bg); color:var(--risk)} .c-risk b,.c-risk strong{color:var(--risk)}
+  .c-error{background:var(--error-bg); color:var(--error)} .c-error b,.c-error strong{color:var(--error)}
+  .c-done{background:var(--done-bg); color:var(--done)} .c-done b,.c-done strong{color:var(--done)}
+  .c-decision{background:var(--decision-bg); color:var(--decision)} .c-decision b,.c-decision strong{color:var(--decision)}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:.9rem}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+  th{font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.84rem; white-space:nowrap}
+  td code{font-size:.84rem}
+  .add{color:var(--done)} .del{color:var(--error)}
+
+  .codeblock{position:relative; margin:12px 0}
+  .codeblock pre{margin:0; background:#1f211d; color:#e7e6df; border-radius:9px; padding:14px 16px; overflow-x:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; line-height:1.55}
+  .copybtn{position:absolute; top:9px; right:9px; font:inherit; font-size:.72rem; font-weight:650; color:#cfcec6; background:#34362f; border:1px solid #4a4c43; padding:4px 9px; border-radius:6px; cursor:pointer}
+  .copybtn:hover{background:#42443b; color:#fff} .copybtn.ok{color:#9fe0b6; border-color:#3e6b4f}
+
+  /* pipeline diagram */
+  .pipe{display:flex; flex-direction:column; gap:10px; margin:14px 0 4px}
+  .pipe-row{display:grid; grid-template-columns:1fr; gap:10px}
+  .pipe-step{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; position:relative; overflow:hidden; display:flex; flex-direction:column; gap:4px}
+  .pipe-step::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent)}
+  .pipe-step.in-sugef::before{background:var(--info)} .pipe-step.in-lead::before{background:var(--decision)}
+  .pipe-step.out-flow::before{background:var(--done)} .pipe-step.out-llm::before{background:var(--risk)}
+  .pipe-title{font-weight:700; font-size:.95rem; display:flex; align-items:center; gap:8px; color:var(--ink)}
+  .pipe-tag{font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:5px; background:var(--surface-2); color:var(--ink-faint)}
+  .pipe-file{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.78rem; color:var(--ink-soft)}
+  .pipe-desc{font-size:.84rem; color:var(--ink-soft); line-height:1.45}
+  .pipe-arrow{text-align:center; color:var(--ink-faint); font-size:.9rem; line-height:1; padding:1px 0}
+  @media (min-width:760px){
+    .pipe-row{grid-template-columns:repeat(2,1fr)}
+    .pipe-arrow{transform:rotate(90deg); padding:6px 0}
+  }
+  @media (min-width:1000px){
+    .pipe-row{grid-template-columns:repeat(4,1fr); gap:8px}
+    .pipe-arrow{display:none}
+    .pipe-step .arrow-r{position:absolute; right:-12px; top:50%; transform:translateY(-50%); color:var(--ink-faint); font-size:1.1rem; z-index:2; background:var(--bg); padding:2px 0}
+  }
+
+  /* nivel badge (1/2/3) */
+  .nivel{display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-weight:800; font-size:.82rem; color:#fff}
+  .n1{background:#b3261e} .n2{background:#9a6400} .n3{background:#2e7d52}
+
+  .na{position:fixed; right:18px; bottom:18px; width:min(330px,calc(100vw - 36px)); background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-pop); z-index:50; overflow:hidden}
+  .na-head{display:flex; align-items:center; gap:9px; padding:11px 13px; background:var(--surface-2); border-bottom:1px solid var(--border)}
+  .na-head .t{font-weight:700; font-size:.86rem; flex:1}
+  .na-head .ct{font-size:.72rem; font-weight:700; color:#fff; background:var(--risk); border-radius:999px; padding:1px 8px}
+  .na-head .ct.clear{background:var(--done)}
+  .na-x{border:none; background:none; cursor:pointer; color:var(--ink-faint); font-size:1.05rem; line-height:1; padding:2px 4px} .na-x:hover{color:var(--ink)}
+  .na-list{list-style:none; margin:0; padding:6px; max-height:46vh; overflow:auto}
+  .na-list li a{display:flex; gap:9px; align-items:flex-start; padding:9px 10px; border-radius:8px; color:var(--ink); font-size:.85rem; line-height:1.4}
+  .na-list li a:hover{background:var(--surface-2); text-decoration:none}
+  .na-empty{padding:18px 14px; text-align:center; color:var(--ink-soft); font-size:.88rem}
+  .na-reopen{position:fixed; right:18px; bottom:18px; z-index:50; display:none; align-items:stretch; border-radius:999px; overflow:hidden; box-shadow:var(--shadow-pop)}
+  .na-reopen.show{display:inline-flex}
+  .na-reopen button{font:inherit; font-size:.8rem; font-weight:650; color:var(--bg); background:var(--ink); border:none; cursor:pointer}
+  .na-reopen .nr-main{padding:9px 13px; display:inline-flex; align-items:center; gap:7px}
+  .na-reopen .nr-x{padding:9px 12px; border-left:1px solid rgba(255,255,255,.22); font-weight:800}
+  .na-reopen button:hover{filter:brightness(1.35)}
+
+  .reveal{opacity:0; transform:translateY(10px)} .reveal.in{opacity:1; transform:none; transition:opacity .24s ease, transform .24s ease}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1 !important; transform:none !important; transition:none !important} .chev{transition:none}
+  }
+  footer{border-top:1px solid var(--border); padding:22px 0 40px; color:var(--ink-faint); font-size:.82rem}
+  footer a{color:var(--ink-faint)} footer a:hover{color:var(--accent)}
+  @media (max-width:820px){
+    .grid{grid-template-columns:1fr; gap:8px}
+    nav.toc{position:static; max-height:none; margin-bottom:6px; border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface)}
+    nav.toc ol{border-left:none; columns:2; column-gap:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="reveal">
+      <div class="eyebrow">Arquitectura · feature feat/motor-calificador-buro-mock</div>
+      <h1>Motor calificador con mock de buró</h1>
+      <p class="tldr">Clasifica cada lead del bot de WhatsApp en un <b>nivel de riesgo 1/2/3</b> usando un mock determinístico de Equifax/SUGEF. El mismo idNumber siempre produce el mismo resultado. Sin acceso real al buró todavía.</p>
+    </div>
+    <div class="steps reveal" aria-label="Estado del feature">
+      <span class="step on"><span class="dot"></span>implementado</span><span class="bar"></span>
+      <span class="step on"><span class="dot"></span>/vet SHIP</span><span class="bar"></span>
+      <span class="step on"><span class="dot"></span>/exercise OK</span><span class="bar"></span>
+      <span class="step on"><span class="dot"></span>PR #1 abierto</span>
+    </div>
+    <div class="stats reveal">
+      <div class="stat s-done"><span class="h"><span aria-hidden="true">✓</span> L</span><span class="l">esfuerzo</span></div>
+      <div class="stat"><span class="n" data-to="4">0</span><span class="l">capas nuevas</span></div>
+      <div class="stat s-done"><span class="n" data-to="63">0</span><span class="l">tests en verde</span></div>
+      <div class="stat"><span class="n" data-to="19">0</span><span class="l">archivos</span></div>
+      <div class="stat s-risk"><span class="h"><span aria-hidden="true">▲</span> Media</span><span class="l">superficie PII</span></div>
+      <div class="stat"><span class="n" data-prefix="~" data-suffix="m" id="rtStat">0</span><span class="l">lectura</span></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <nav class="toc" aria-label="Secciones"><p class="toc-h">En esta página</p><ol id="tocList"></ol></nav>
+
+    <main id="content">
+      <div class="controls reveal">
+        <button class="ctrl" id="expandAll">▾ Expandir todo</button>
+        <button class="ctrl" id="collapseAll">▸ Colapsar todo</button>
+      </div>
+
+      <div class="timeline">
+
+        <!-- 01 QUÉ ES -->
+        <div class="node reveal">
+          <span class="node-dot d-info" aria-hidden="true">●</span>
+          <section class="card" id="summary" data-title="Qué es" data-accent="info">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">01</span><span class="s-title">Qué es y por qué</span><span class="s-tag">contexto de negocio</span></summary>
+              <div class="body">
+                <p>PreCali es un bot de WhatsApp que precalifica leads para créditos bancarios en Costa Rica. La <strong>Fase 3 del roadmap Zero-Friction</strong> pide clasificar cada lead en un nivel de riesgo para que el bot pueda:</p>
+                <ul>
+                  <li><strong>Ajustar el tono</strong> del asesor conversacional (educativo para riesgo alto, comercial para prime).</li>
+                  <li><strong>Decidir el siguiente paso</strong> en el flujo: ofrecer banco tradicional, alternativa con más apetito de riesgo, o redirigir a un plan de saneamiento a 6 meses.</li>
+                </ul>
+                <p>No existe acceso real a la API de Equifax todavía. Este feature entrega <strong>el mock del buró + el motor de clasificación puro</strong>, dejando la integración real fuera de alcance.</p>
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Fuentes del mock.</strong> Las 8 categorías reales del CIC de SUGEF (<code>A1, A2, B1, B2, C1, C2, D, E</code>) y el Comportamiento de Pago Histórico en 3 niveles, con historial de 48 meses. El portal <code>developer.latam.equifax.com</code> confirma OAuth2 + sandbox pero su JSON schema exacto está detrás de login.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 02 PIPELINE -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">▣</span>
+          <section class="card" id="pipeline" data-title="Pipeline del flujo" data-accent="accent">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">02</span><span class="s-title">Pipeline del flujo</span><span class="s-tag">cédula → nivel → acciones</span></summary>
+              <div class="body">
+                <p>El pipeline se dispara cuando el usuario envía nombre + cédula + email en el paso <code>stepLeadDatos</code>. Hasta ese momento el flujo es el mismo que antes; desde ahí en adelante, todo gateo depende del nivel calculado.</p>
+
+                <div class="pipe">
+                  <div class="pipe-row">
+                    <div class="pipe-step in-lead">
+                      <div class="pipe-title">Captura de cédula <span class="arrow-r" aria-hidden="true">→</span></div>
+                      <div class="pipe-file">flow.ts · stepLeadDatos</div>
+                      <div class="pipe-desc">El usuario manda su cédula en un mensaje. Una línea de consentimiento (Ley 9859) va en el mismo texto que la pide.</div>
+                    </div>
+                    <div class="pipe-step in-sugef">
+                      <div class="pipe-title">Mock del buró <span class="arrow-r" aria-hidden="true">→</span></div>
+                      <div class="pipe-file">buro/mock-equifax.ts</div>
+                      <div class="pipe-desc">Hash FNV-1a de la cédula → PRNG mulberry32 → <code>BuroMockResponse</code> determinístico. Nunca <code>Math.random</code> ni <code>Date.now</code> dentro.</div>
+                    </div>
+                    <div class="pipe-step">
+                      <div class="pipe-title">Motor de reglas <span class="arrow-r" aria-hidden="true">→</span></div>
+                      <div class="pipe-file">buro/engine.ts · calificarLead()</div>
+                      <div class="pipe-desc">Aplica 5 reglas en orden fijo (mora → categoría SUGEF → score → ratio → cap) y devuelve <code>EngineResult</code> con <code>nivel: 1|2|3</code>.</div>
+                    </div>
+                    <div class="pipe-step">
+                      <div class="pipe-title">Persistencia en sesión</div>
+                      <div class="pipe-file">whatsapp/types.ts · memory.ts</div>
+                      <div class="pipe-desc"><code>session.buroResult</code> guarda el resultado. Solo se persiste en memoria por now — el TTL de 90 días (Ley 8968) queda como gap explícito.</div>
+                    </div>
+                  </div>
+                  <div class="pipe-arrow" aria-hidden="true">↓</div>
+                  <div class="pipe-row">
+                    <div class="pipe-step out-flow">
+                      <div class="pipe-title">Gateo del flujo <span class="arrow-r" aria-hidden="true">→</span></div>
+                      <div class="pipe-file">flow.ts · goToHardPull</div>
+                      <div class="pipe-desc">Nivel 1 → mensaje de rescate + <code>session.step = "pausado"</code> (sin botón "Autorizo banco"). Nivel 2 → nota de prima/ajuste en el prompt de autorización.</div>
+                    </div>
+                    <div class="pipe-step out-llm">
+                      <div class="pipe-title">Tono del asesor IA</div>
+                      <div class="pipe-file">whatsapp/agent.ts · nivelRiesgoInstruccion()</div>
+                      <div class="pipe-desc">El system prompt recibe <strong>solo el número de nivel</strong> (1/2/3). Nunca el score ni operaciones — invariante PII (CWE-200).</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Límite de alcance.</strong> La primera tabla de simulación de bancos se muestra <em>antes</em> de pedir la cédula, así que el nivel no puede gatearla sin un rediseño mayor. El nivel aplica desde <code>stepLeadDatos</code> en adelante (decisión confirmada con el usuario).</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 03 CAPAS -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">▣</span>
+          <section class="card" id="capas" data-title="Capas y archivos" data-accent="accent">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">03</span><span class="s-title">Capas y archivos</span><span class="s-tag">4 nuevas + 4 adaptadas</span></summary>
+              <div class="body">
+                <h3>Archivos nuevos</h3>
+                <table>
+                  <thead><tr><th>Archivo</th><th>Rol</th><th>Tipo</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>src/types/buro.ts</code></td><td>Tipos de dominio: <code>SugefCategoria</code>, <code>BuroMockResponse</code>, <code>EngineConfig</code>, <code>EngineResult</code>.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/mock-equifax.ts</code></td><td>Generador determinístico del mock del buró a partir del idNumber.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/engine.ts</code></td><td><code>calificarLead()</code> + <code>DEFAULT_ENGINE_CONFIG</code>. Reglas de precedencia fija.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/__tests__/*.test.ts</code></td><td>Tests de mock (4) y engine (10): determinismo, cobertura de cada rama, sanitización de config.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                  </tbody>
+                </table>
+                <h3>Archivos adaptados</h3>
+                <table>
+                  <thead><tr><th>Archivo</th><th>Cambio</th><th>Tipo</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>src/lib/whatsapp/types.ts</code></td><td><code>Session</code> gana <code>buroResult: EngineResult | null</code>.</td><td><span class="badge b-mod">◐ mod</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/memory.ts</code></td><td><code>defaultSession()</code> inicializa <code>buroResult: null</code>.</td><td><span class="badge b-mod">◐ mod</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/flow.ts</code></td><td>Cálculo del nivel en <code>stepLeadDatos</code>, gateo en <code>goToHardPull</code>, consentimiento en <code>goToLeadCapture</code>, nota en <code>hardPullPrompt</code>.</td><td><span class="badge b-mod">◐ mod</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/agent.ts</code></td><td><code>ResolverDudaContext.nivelRiesgo</code> + <code>nivelRiesgoInstruccion()</code> inyectada en <code>buildSystemPrompt</code>.</td><td><span class="badge b-mod">◐ mod</span></td></tr>
+                  </tbody>
+                </table>
+                <p>Tooling adicional: <code>scripts/probar-bot.ts</code> (script de prueba manual con <code>tsx</code>) y 2 nuevos archivos de tests en <code>src/lib/whatsapp/__tests__/</code> (flow + agent).</p>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 04 MOTOR DE REGLAS -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">$</span>
+          <section class="card" id="motor" data-title="Motor de reglas" data-accent="accent">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">04</span><span class="s-title">Motor: precedencia de reglas</span><span class="s-tag">5 reglas en orden fijo</span></summary>
+              <div class="body">
+                <p>El motor <code>calificarLead(buro, profile)</code> aplica las reglas en orden estricto. La primera que matchea fija el nivel. <strong>El orden no se puede reinterpretar</strong> — está fijado por negocio y validado en tests.</p>
+                <table>
+                  <thead><tr><th>#</th><th>Regla</th><th>Nivel</th><th>Notas</th></tr></thead>
+                  <tbody>
+                    <tr><td class="num">1</td><td>Mora activa severa: cualquier operación con <code>diasAtraso &gt; 90</code></td><td><span class="nivel n1">1</span></td><td>Override duro. Pisa categoría y score, sin excepción.</td></tr>
+                    <tr><td class="num">2</td><td>Categoría SUGEF en <code>{B2, C1, C2, D, E}</code></td><td><span class="nivel n1">1</span></td><td>B2 explícitamente cuenta como alto riesgo (corregido por el usuario sobre el default inicial).</td></tr>
+                    <tr><td class="num">3</td><td>Categoría <code>{A1, A2, B1}</code> + <code>score ≥ 700</code> + <code>ratio deuda/ingreso ≤ 0.45</code></td><td><span class="nivel n3">3</span></td><td>Prime precalificado: umbrales estrictos en score y ratio.</td></tr>
+                    <tr><td class="num">4</td><td>Default para categoría <code>{A1, A2, B1}</code> que no cumple la regla 3</td><td><span class="nivel n2">2</span></td><td>Buen historial pero score o ratio insuficiente.</td></tr>
+                    <tr><td class="num">5</td><td><em>Cap:</em> si <code>ratio deuda/ingreso &gt; 0.50</code> y el nivel resultante es 3 → baja a 2</td><td><span class="nivel n2">2</span></td><td>Marca <code>ratioAlto = true</code>. Nunca permite Nivel 3 con deuda alta.</td></tr>
+                  </tbody>
+                </table>
+                <p>Flag lateral (no cambia el nivel): si <code>entidadesConsultantesUltimos30Dias &gt; 5</code> → <code>shoppingCredito = true</code>. Se reporta en <code>EngineResult</code> para logging/debug pero no participa en la decisión.</p>
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Sanitización de config.</strong> <code>mergeConfig()</code> valida que cada umbral custom sea <code>typeof number && Number.isFinite && ≥ 0</code>. Un valor corrupto cae a <code>DEFAULT_ENGINE_CONFIG</code> en ese campo — un umbral roto no puede aprobar o rechazar leads silenciosamente (CWE-20).</div></div>
+                <h3>Defaults (<code>DEFAULT_ENGINE_CONFIG</code>)</h3>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>scorePrimeThreshold:         700    // umbral "prime"
+ratioDeudaIngresoAlerta:     0.50   // arriba de esto → cap a Nivel 2
+ratioDeudaIngresoPrecalificado: 0.45 // tope para Nivel 3
+moraActivaDiasLimite:        90     // &gt;90 días → Nivel 1 duro
+shoppingCreditoConsultas30d: 5      // &gt;5 consultas → flag (no cambia nivel)</pre></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 05 MOCK -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">$</span>
+          <section class="card" id="mock" data-title="Mock determinístico" data-accent="accent">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">05</span><span class="s-title">Mock del buró (determinístico)</span><span class="s-tag">hash FNV-1a + mulberry32</span></summary>
+              <div class="body">
+                <p>El generador convierte la cédula en una respuesta de buró reproducible. <strong>La misma cédula produce siempre el mismo resultado byte a byte</strong> — clave para demos y tests estables.</p>
+                <h3>Cadena de derivación</h3>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>idNumber
+  │
+  ├─ fnv1a(idNumber)              → semilla entera de 32 bits (hash aritmético puro)
+  │
+  └─ mulberry32(seed)             → PRNG () =&gt; float en [0, 1)
+        │
+        ├─ pickCategoria()        → una de 8 categorías SUGEF (distribución ponderada)
+        ├─ score                  → randInt en [scoreMin, scoreMax] de la categoría
+        ├─ operaciones[]          → 0-4 operaciones, monto/días coherentes con la categoría
+        ├─ montoTotalAdeudado     → suma de operaciones
+        ├─ consultas30d           → sesgadas a 0, con bump para categorías de riesgo
+        └─ protestosComerciales   → probabilidad por categoría</pre></div>
+                <p>Las categorías malas (C1/C2/D/E) tienen <code>moraGarantizada: true</code>: si el PRNG no produjo ninguna mora activa, se fuerza al menos una sobre una operación existente. Así el mock es coherente con la regla 1 del motor.</p>
+                <h3>Distribución de categorías (pesos realistas)</h3>
+                <table>
+                  <thead><tr><th>Categoría</th><th>Peso</th><th>Score</th><th>Mora garantizada</th><th>Notas</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>A1</code></td><td class="num">5%</td><td class="num">800–850</td><td>no</td><td>cola prime</td></tr>
+                    <tr><td><code>A2</code></td><td class="num">18%</td><td class="num">740–810</td><td>no</td><td>masa central</td></tr>
+                    <tr><td><code>B1</code></td><td class="num">22%</td><td class="num">680–750</td><td>no</td><td>masa central</td></tr>
+                    <tr><td><code>B2</code></td><td class="num">20%</td><td class="num">620–690</td><td>no</td><td>masa central · <strong>mapea a Nivel 1</strong></td></tr>
+                    <tr><td><code>C1</code></td><td class="num">14%</td><td class="num">540–630</td><td>sí</td><td>cola de riesgo</td></tr>
+                    <tr><td><code>C2</code></td><td class="num">10%</td><td class="num">460–550</td><td>sí</td><td>cola de riesgo</td></tr>
+                    <tr><td><code>D</code></td><td class="num">7%</td><td class="num">380–470</td><td>sí</td><td>cola de riesgo</td></tr>
+                    <tr><td><code>E</code></td><td class="num">4%</td><td class="num">300–390</td><td>sí</td><td>cola de riesgo</td></tr>
+                  </tbody>
+                </table>
+                <p style="font-size:.85rem; color:var(--ink-faint)">Pesos elegidos para que la mayoría de cédulas de prueba caigan en B1/B2 (lo más común en población real). 200 cédulas generan ≥3 categorías distintas — test de sanity en <code>mock-equifax.test.ts</code>.</p>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 06 INVARIANTES -->
+        <div class="node reveal">
+          <span class="node-dot d-risk" aria-hidden="true">▲</span>
+          <section class="card" id="invariantes" data-title="Invariantes de seguridad" data-accent="risk">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">06</span><span class="s-title">Invariantes de seguridad</span><span class="s-tag">4 reglas no negociables</span></summary>
+              <div class="body">
+                <div class="callout c-error"><span class="gi" aria-hidden="true">✕</span><div><strong>CWE-200 · PII financiera.</strong> La cédula (<code>idNumber</code>) y el payload crudo del buró (score, operaciones, protestos) <strong>nunca se envían a Groq</strong>. El system prompt del asesor solo recibe el <code>nivel</code> derivado + flags booleanos. Verificado por test <code>agent.test.ts</code> que aserta que ningún campo crudo aparece en el prompt.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-20 · Validación de config.</strong> <code>mergeConfig()</code> rechaza umbrales <code>NaN</code>/<code>undefined</code>/negativos y cae a defaults. Un umbral corrupto no puede aprobar o rechazar leads silenciosamente.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-77/78 · Inyección.</strong> El hash que siembra el PRNG es puramente aritmético sobre el string del <code>idNumber</code>. Sin <code>eval</code>, sin interpolación en plantillas o comandos shell.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-359 · Retención de PII.</strong> No se persiste <code>BuroMockResponse</code> ni <code>EngineResult</code> fuera de la sesión en memoria. <strong>El TTL/purga de 90 días (Ley 8968) queda como gap documentado</strong> — requiere una capa de persistencia que no existe aún. Ver Needs Attention.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 07 ENGANCHES -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">$</span>
+          <section class="card" id="enganches" data-title="Enganches al bot" data-accent="accent">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">07</span><span class="s-title">Enganches al bot existente</span><span class="s-tag">flow.ts · agent.ts</span></summary>
+              <div class="body">
+                <h3>flow.ts · <code>stepLeadDatos</code> — cálculo del nivel</h3>
+                <p>Al validar la cédula, antes de transicionar a <code>lead_fuente_ingresos</code>:</p>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>const buro = generateMockBuroResponse(parsed.idNumber, new Date().toISOString());
+const buroResult = calificarLead(buro, session.profile);
+
+const s: Session = {
+  ...session,
+  step: "lead_fuente_ingresos",
+  lead: { ...(session.lead || LEAD_EMPTY), ...parsed },
+  buroResult,  // ← queda guardado en la sesión
+};</pre></div>
+                <h3>flow.ts · <code>goToHardPull</code> — gateo por nivel</h3>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>if (session.buroResult?.nivel === 1) {
+  // Nivel 1: NO se ofrece "Autorizo banco". Mensaje de rescate + pausa.
+  return {
+    actions: [actionTexto("...plan de saneamiento a 6 meses...")],
+    session: { ...session, step: "pausado" },
+  };
+}
+// Nivel 2 y 3: botón normal, pero Nivel 2 agrega nota de prima/ajuste.
+return { actions: [hardPullPrompt(s)], session: s };</pre></div>
+                <h3>agent.ts · <code>nivelRiesgoInstruccion()</code> — tono por nivel</h3>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>case 1: return "- Nivel de riesgo: 1 (alto riesgo). No vendas productos bancarios:
+                rol educativo y empatico, plan de saneamiento a 6 meses.";
+case 2: return "- Nivel de riesgo: 2 (riesgo medio). Aclara mayor prima/enganche o
+                ajuste de monto; prioriza cooperativas/financieras.";
+case 3: return "- Nivel de riesgo: 3 (cliente prime). Conversion rapida: prioriza
+                mejores tasas y bancos lideres.";</pre></div>
+                <div class="callout c-done"><span class="gi" aria-hidden="true">✓</span><div><strong>Bug encontrado y corregido por <code>/vet</code>.</strong> <code>redisplayStep("confirmar_hard_pull")</code> perdía la nota de Nivel 2 al re-mostrarse. Se extrajo <code>hardPullPrompt()</code> compartido entre <code>goToHardPull</code> y <code>redisplayStep</code> para que ambas rutas muestren exactamente el mismo prompt.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 08 DECISIONES -->
+        <div class="node reveal">
+          <span class="node-dot d-decision" aria-hidden="true">◆</span>
+          <section class="card" id="decisiones" data-title="Decisiones de negocio" data-accent="decision">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">08</span><span class="s-title">Decisiones de negocio confirmadas</span><span class="s-tag">4 + 2 no bloqueantes</span></summary>
+              <div class="body">
+                <h3>Decisiones que moldearon el diseño</h3>
+                <table>
+                  <thead><tr><th>#</th><th>Decisión</th><th>Razón</th></tr></thead>
+                  <tbody>
+                    <tr><td class="num">D1</td><td><strong>B2 → Nivel 1</strong> (alto riesgo), no Nivel 2.</td><td>Corregido por el usuario sobre el default. Una categoría B2 debe tratarse como riesgo alto, igual que C1-E.</td></tr>
+                    <tr><td class="num">D2</td><td>El mock se dispara <strong>justo después de capturar la cédula</strong>, sin tocar el paso OCR existente.</td><td>Mantiene el paso de OCR (<code>stepAutorizarSoftPreCali</code>) intacto. Son dos cosas distintas.</td></tr>
+                    <tr><td class="num">D3</td><td>El mock es <strong>determinístico por cédula</strong>.</td><td>Mismo idNumber → mismo resultado. Reproducible en pruebas y demos.</td></tr>
+                    <tr><td class="num">D4</td><td>El nivel <strong>no gatea la primera tabla de bancos</strong>.</td><td>El banco se elige antes de pedir la cédula. Gatear la primera oferta requeriría mover la captura arriba — rediseño mayor, fuera de alcance.</td></tr>
+                  </tbody>
+                </table>
+                <h3>Preguntas no bloqueantes (confirmadas para esta fase mock)</h3>
+                <div class="callout c-decision"><span class="gi" aria-hidden="true">◆</span><div><strong>Q1 · Consentimiento (Ley 9859 art. 44 bis).</strong> Una sola línea de texto en el mensaje que pide la cédula, sin paso de botón extra. Preserva la fricción cero. Se revisará con abogado cuando llegue el acceso real al buró.</div></div>
+                <div class="callout c-decision"><span class="gi" aria-hidden="true">◆</span><div><strong>Q2 · Escala de score 300-850, umbral prime 700.</strong> Placeholder razonable (convención tipo FICO/VantageScore). Equifax CR/LATAM no publica su schema sin login. Se recalibra cuando exista sandbox real.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 09 FUERA DE ALCANCE -->
+        <div class="node reveal">
+          <span class="node-dot d-done" aria-hidden="true">→</span>
+          <section class="card" id="next" data-title="Fuera de alcance" data-accent="done">
+            <details>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">09</span><span class="s-title">Fuera de alcance (próximos pasos)</span><span class="s-tag" id="nsTag">4 pendientes</span></summary>
+              <div class="body">
+                <div class="ns-bar">
+                  <button class="copybtn copyans" id="copyNext" style="position:static; background:var(--accent); color:#fff; border-color:var(--accent); font-weight:650; padding:8px 14px;">Copiar próximos pasos</button>
+                  <span class="q-summary" id="nsSummary" style="font-size:.85rem;color:var(--ink-soft)"></span>
+                </div>
+                <ul class="ns">
+                  <li data-id="equifax"><input type="checkbox"><span class="tx">Integración real con Equifax LATAM ICIC<small>OAuth2 client_credentials + sandbox + whitelisting de IPs. Reemplaza <code>mock-equifax.ts</code> por el cliente real manteniendo la firma <code>generateMockBuroResponse</code> → <code>fetchBuroResponse</code>.</small></span></li>
+                  <li data-id="persistencia"><input type="checkbox"><span class="tx">Capa de persistencia + purga de 90 días<small>Ley 8968 exige TTL. Hoy todo vive en <code>memory.ts</code> en memoria. Sin DB no se puede purgar nada.</small></span></li>
+                  <li data-id="redesign"><input type="checkbox"><span class="tx">Rediseñar captura de cédula al inicio del flujo<small>Para que el nivel gatee también la primera tabla de simulación de bancos. Es el "rediseño mayor" descartado en D4.</small></span></li>
+                  <li data-id="abogado"><input type="checkbox"><span class="tx">Validación legal del texto de consentimiento<small>Abogado revisa la línea actual contra Ley 8968/9859 art. 44 bis antes de producción real.</small></span></li>
+                </ul>
+              </div>
+            </details>
+          </section>
+        </div>
+      </div>
+
+      <footer>Generado desde el PR <a href="https://github.com/AI-Ventures-Tech/PreCali/pull/1">#1</a> (commit <code>6ab5c92</code>) · documentación regenerable, no editar a mano · PreCali · feature/motor-calificador-buro-mock</footer>
+    </main>
+  </div>
+</div>
+
+<aside class="na" id="na" aria-label="Needs attention">
+  <div class="na-head"><span aria-hidden="true" style="color:var(--risk)">▲</span><span class="t">Needs attention</span>
+    <span class="ct" id="naCount">3</span><button class="na-x" id="naClose" aria-label="Cerrar panel">×</button></div>
+  <ul class="na-list" id="naList">
+    <li><a href="#invariantes"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>Purga Ley 8968 sin implementar</strong> — falta capa de persistencia</span></a></li>
+    <li><a href="#decisiones"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>Escala 300-850/700 es placeholder</strong> — recalibrar con sandbox Equifax</span></a></li>
+    <li><a href="#next"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>Commit <code>b287c6e</code> incluido en PR</strong> — era previo en develop, irá a main con este PR</span></a></li>
+  </ul>
+</aside>
+<div class="na-reopen" id="naReopen"><button class="nr-main" id="naReopenMain"><span aria-hidden="true">▲</span> Needs attention (<span id="naReopenN">3</span>)</button><button class="nr-x" id="naReopenX" aria-label="Ocultar del todo">×</button></div>
+
+<style>
+  .ns-bar{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin:12px 0 14px}
+  .ns{list-style:none; margin:8px 0 0; padding:0}
+  .ns li{display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px dashed var(--border)}
+  .ns li:last-child{border-bottom:none}
+  .ns input{margin-top:3px; flex:none; width:17px; height:17px; accent-color:var(--accent); cursor:pointer}
+  .ns .tx{flex:1; min-width:0; color:var(--ink)} .ns .tx small{display:block; color:var(--ink-faint); font-size:.82rem; margin-top:2px}
+  .ns li.done .tx{color:var(--ink-faint); text-decoration:line-through}
+</style>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var mins=1;
+  try{ var txt=(document.getElementById('content').innerText||'').trim();
+    var words=txt?txt.split(/\s+/).length:0; mins=Math.max(1,Math.ceil(words/238)); }catch(e){}
+
+  function countUp(el,to,prefix,suffix){
+    if(reduce){ el.textContent=(prefix||'')+to+(suffix||''); return; }
+    var start=null;
+    function tick(ts){ if(!start)start=ts; var p=Math.min(1,(ts-start)/900);
+      el.textContent=(prefix||'')+Math.round((1-Math.pow(1-p,3))*to)+(suffix||''); if(p<1)requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  }
+  document.querySelectorAll('.stat .n').forEach(function(el){
+    var to = el.id==='rtStat' ? mins : parseInt(el.getAttribute('data-to')||'0',10);
+    countUp(el,to,el.getAttribute('data-prefix')||'',el.getAttribute('data-suffix')||'');
+  });
+
+  var secs=[].slice.call(document.querySelectorAll('section.card[data-title]'));
+  var tocList=document.getElementById('tocList'), links={};
+  secs.forEach(function(s){ var li=document.createElement('li'), a=document.createElement('a');
+    a.href='#'+s.id; a.textContent=s.getAttribute('data-title'); li.appendChild(a); tocList.appendChild(li); links[s.id]=a; });
+  var spy=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){
+    Object.keys(links).forEach(function(k){links[k].classList.remove('here');});
+    if(links[en.target.id])links[en.target.id].classList.add('here'); } }); }, {rootMargin:'-12% 0px -70% 0px',threshold:0});
+  secs.forEach(function(s){ spy.observe(s); });
+
+  var reveals=[].slice.call(document.querySelectorAll('.reveal'));
+  if(reduce){ reveals.forEach(function(el){ el.classList.add('in'); }); }
+  else{ var io=new IntersectionObserver(function(es,obs){ es.forEach(function(en){
+    if(en.isIntersecting){ en.target.classList.add('in'); obs.unobserve(en.target); } }); },
+    {rootMargin:'0px 0px -8% 0px',threshold:.06}); reveals.forEach(function(el){ io.observe(el); }); }
+
+  function setAll(o){ document.querySelectorAll('section.card details').forEach(function(d){ d.open=o; }); }
+  document.getElementById('expandAll').addEventListener('click',function(){ setAll(true); });
+  document.getElementById('collapseAll').addEventListener('click',function(){ setAll(false); });
+
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    if(btn.id==='copyNext') return;
+    btn.addEventListener('click',function(){ var pre=btn.parentElement.querySelector('pre'); var t=pre?pre.innerText:'';
+      function ok(){ var o=btn.textContent; btn.textContent='Copiado ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent=o; btn.classList.remove('ok'); },1400); }
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(ok).catch(function(){fb(t,ok);}); } else fb(t,ok); }); });
+  function fb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+
+  var na=document.getElementById('na'), reopen=document.getElementById('naReopen');
+  document.getElementById('naClose').addEventListener('click',function(){ na.style.display='none'; reopen.classList.add('show'); });
+  document.getElementById('naReopenMain').addEventListener('click',function(){ na.style.display=''; reopen.classList.remove('show'); });
+  document.getElementById('naReopenX').addEventListener('click',function(){ reopen.classList.remove('show'); });
+})();
+
+(function(){
+  "use strict";
+  var items=[].slice.call(document.querySelectorAll('.ns li'));
+  if(!items.length) return;
+  var STORE='haq-next-'+((location.pathname.split('/').pop())||'result');
+  var mem={};
+  function load(){ try{ return JSON.parse(localStorage.getItem(STORE))||{}; }catch(e){ return mem; } }
+  function save(d){ try{ localStorage.setItem(STORE,JSON.stringify(d)); }catch(e){ mem=d; } }
+  var state=load();
+  var nsSummary=document.getElementById('nsSummary'), nsTag=document.getElementById('nsTag');
+
+  function refresh(){
+    var done=0;
+    items.forEach(function(li){ var c=li.querySelector('input').checked; li.classList.toggle('done',c); if(c) done++; });
+    var pend=items.length-done;
+    if(nsSummary) nsSummary.innerHTML='<b>'+done+'/'+items.length+'</b> hechos · <b>'+pend+'</b> pendientes';
+    if(nsTag) nsTag.textContent=pend+' pendientes';
+  }
+  items.forEach(function(li){
+    var id=li.getAttribute('data-id'), cb=li.querySelector('input');
+    if(state[id]) cb.checked=true;
+    cb.addEventListener('change',function(){
+      var d=load(); d[id]=cb.checked; save(d); refresh();
+    });
+  });
+  var copyBtn=document.getElementById('copyNext');
+  if(copyBtn) copyBtn.addEventListener('click',function(){
+    var pend=[];
+    items.forEach(function(li){ if(!li.querySelector('input').checked){
+      var tx=li.querySelector('.tx').cloneNode(true);
+      var sm=tx.querySelector('small'); if(sm) sm.parentNode.removeChild(sm);
+      pend.push('- '+tx.textContent.replace(/\s+/g,' ').trim()); }});
+    var text=pend.length
+      ? 'Seguí con estos próximos pasos pendientes del feature motor-calificador-buro-mock:\n'+pend.join('\n')
+      : 'Todos los próximos pasos quedaron hechos; no hay pendientes.';
+    function ok(){ copyBtn.textContent='Copiado ✓'; copyBtn.classList.add('ok');
+      setTimeout(function(){ copyBtn.textContent='Copiar próximos pasos'; copyBtn.classList.remove('ok'); },1500); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(function(){ nfb(text,ok); }); } else nfb(text,ok);
+  });
+  function nfb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+  refresh();
+})();
+</script>
+</body>
+</html>

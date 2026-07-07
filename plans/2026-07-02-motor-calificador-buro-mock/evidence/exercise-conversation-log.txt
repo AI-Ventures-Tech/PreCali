@@ -1,0 +1,298 @@
+
+===== Conversacion: Nivel 1 (alto riesgo) (cedula 1-0001-0000) =====
+
+--> usuario: ""
+<-- bot (step=pedir_producto):
+[BUTTONS] Hola. Soy *PreCali IA*, tu asesor de credito. Que queres simular hoy?
+  opciones: personal:Personal | vehiculo:Vehiculo | hipoteca:Vivienda
+
+--> usuario: [boton:personal]
+<-- bot (step=pedir_ingreso):
+[TEXT] Perfecto, *credito personal*.
+Para armar tu comparacion voy a pedirte los datos paso a paso.
+
+💰 *Fase 1/2: Ingreso*
+¿Cuanto es tu ingreso neto mensual exacto?
+
+--> usuario: "900000"
+<-- bot (step=pedir_deudas):
+[TEXT] 💳 *Fase 2/2: Deudas*
+¿Tenes alguna deuda mensual actual?
+Si tenes, escribi el monto exacto.
+Si no tenes deudas, escribi 0.
+
+--> usuario: "150000"
+<-- bot (step=post_resultado):
+[TEXT] Comparativa preliminar para prestamo personal:
+
+*Banco Popular*
+- Tasa: 15.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 730 650
+
+*Banco Nacional*
+- Tasa: 16.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 541 960
+
+*Banco de Costa Rica*
+- Tasa: 17% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 192 000/mes*
+- Monto maximo: CRC 7 725 557
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: "0"
+<-- bot (step=post_resultado):
+[TEXT] No pude buscar eso en este momento. Probemos de nuevo en unos minutos, o seguimos con la siguiente pregunta.
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: [boton:aplicar]
+<-- bot (step=elegir_banco_aplicar):
+[BUTTONS] A que banco queres aplicar?
+  opciones: banco_0:Banco Popular | banco_1:Banco Nacional | banco_2:Banco de Costa Rica
+
+--> usuario: [boton:banco_0]
+<-- bot (step=lead_datos):
+[TEXT] Para preparar tu expediente para *Banco Popular*, necesito estos datos en un solo mensaje:
+Nombre completo
+Cedula o identificacion
+Correo electronico
+
+El telefono sera el mismo desde el que escribiste, salvo que indiques otro.
+
+Al enviarnos tu cedula autorizas a PreCali a consultar tu perfil crediticio con fines de precalificacion.
+
+--> usuario: "Juan Perez\n1-0001-0000\njuan@example.com"
+<-- bot (step=lead_fuente_ingresos):
+[BUTTONS] Cual es tu fuente principal de ingresos?
+  opciones: asalariado:Asalariado | independiente:Independiente | duda:Tengo duda
+
+[EVIDENCIA] session.buroResult.nivel = 1 (esperado: coincide con Nivel 1 (alto riesgo))
+
+--> usuario: [boton:asalariado]
+<-- bot (step=esperar_documentos):
+[TEXT] Para enviar tu expediente a *Banco Popular*, subi por este chat:
+- Orden patronal o comprobantes de pago recientes.
+
+Cuando los recibamos, te pedire autorizacion para el estudio inicial gratuito de PreCali.
+
+--> usuario: "[DOCUMENTO_RECIBIDO]\ncomprobante de ingresos de prueba"
+<-- bot (step=autorizar_soft_precali):
+[BUTTONS] Recibi tus documentos. Para que PreCali realice el estudio crediticio inicial gratuito y cruce los datos, necesito tu autorizacion. Autorizas?
+  opciones: soft_precali_si:Si autorizo | duda:Tengo duda | soft_precali_no:Ahora no
+
+--> usuario: [boton:soft_precali_si]
+<-- bot (step=confirmar_datos_extraidos):
+[BUTTONS] Estudio inicial PreCali listo.
+Documento recibido. No pude leer todos los campos automaticamente.
+
+Confirmas que estos datos son correctos?
+  opciones: datos_ok:Correcto | datos_corregir:Corregir | duda:Tengo duda
+
+--> usuario: [boton:datos_ok]
+<-- bot (step=pausado):
+[TEXT] Con tu perfil crediticio actual, un banco tradicional muy probablemente no te aprobaria todavia. En vez de enviar tu expediente, te propongo una guia para sanear tu historial en los proximos 6 meses y volver a intentar con mejores condiciones. Cuando quieras retomar el tramite bancario, escribime.
+
+[RESULTADO FINAL] step=pausado nivel=1
+
+===== Conversacion: Nivel 2 (riesgo medio) (cedula 1-0024-0000) =====
+
+--> usuario: ""
+<-- bot (step=pedir_producto):
+[BUTTONS] Hola. Soy *PreCali IA*, tu asesor de credito. Que queres simular hoy?
+  opciones: personal:Personal | vehiculo:Vehiculo | hipoteca:Vivienda
+
+--> usuario: [boton:personal]
+<-- bot (step=pedir_ingreso):
+[TEXT] Perfecto, *credito personal*.
+Para armar tu comparacion voy a pedirte los datos paso a paso.
+
+💰 *Fase 1/2: Ingreso*
+¿Cuanto es tu ingreso neto mensual exacto?
+
+--> usuario: "900000"
+<-- bot (step=pedir_deudas):
+[TEXT] 💳 *Fase 2/2: Deudas*
+¿Tenes alguna deuda mensual actual?
+Si tenes, escribi el monto exacto.
+Si no tenes deudas, escribi 0.
+
+--> usuario: "150000"
+<-- bot (step=post_resultado):
+[TEXT] Comparativa preliminar para prestamo personal:
+
+*Banco Popular*
+- Tasa: 15.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 730 650
+
+*Banco Nacional*
+- Tasa: 16.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 541 960
+
+*Banco de Costa Rica*
+- Tasa: 17% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 192 000/mes*
+- Monto maximo: CRC 7 725 557
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: "0"
+<-- bot (step=post_resultado):
+[TEXT] No pude buscar eso en este momento. Probemos de nuevo en unos minutos, o seguimos con la siguiente pregunta.
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: [boton:aplicar]
+<-- bot (step=elegir_banco_aplicar):
+[BUTTONS] A que banco queres aplicar?
+  opciones: banco_0:Banco Popular | banco_1:Banco Nacional | banco_2:Banco de Costa Rica
+
+--> usuario: [boton:banco_0]
+<-- bot (step=lead_datos):
+[TEXT] Para preparar tu expediente para *Banco Popular*, necesito estos datos en un solo mensaje:
+Nombre completo
+Cedula o identificacion
+Correo electronico
+
+El telefono sera el mismo desde el que escribiste, salvo que indiques otro.
+
+Al enviarnos tu cedula autorizas a PreCali a consultar tu perfil crediticio con fines de precalificacion.
+
+--> usuario: "Juan Perez\n1-0024-0000\njuan@example.com"
+<-- bot (step=lead_fuente_ingresos):
+[BUTTONS] Cual es tu fuente principal de ingresos?
+  opciones: asalariado:Asalariado | independiente:Independiente | duda:Tengo duda
+
+[EVIDENCIA] session.buroResult.nivel = 2 (esperado: coincide con Nivel 2 (riesgo medio))
+
+--> usuario: [boton:asalariado]
+<-- bot (step=esperar_documentos):
+[TEXT] Para enviar tu expediente a *Banco Popular*, subi por este chat:
+- Orden patronal o comprobantes de pago recientes.
+
+Cuando los recibamos, te pedire autorizacion para el estudio inicial gratuito de PreCali.
+
+--> usuario: "[DOCUMENTO_RECIBIDO]\ncomprobante de ingresos de prueba"
+<-- bot (step=autorizar_soft_precali):
+[BUTTONS] Recibi tus documentos. Para que PreCali realice el estudio crediticio inicial gratuito y cruce los datos, necesito tu autorizacion. Autorizas?
+  opciones: soft_precali_si:Si autorizo | duda:Tengo duda | soft_precali_no:Ahora no
+
+--> usuario: [boton:soft_precali_si]
+<-- bot (step=confirmar_datos_extraidos):
+[BUTTONS] Estudio inicial PreCali listo.
+Documento recibido. No pude leer todos los campos automaticamente.
+
+Confirmas que estos datos son correctos?
+  opciones: datos_ok:Correcto | datos_corregir:Corregir | duda:Tengo duda
+
+--> usuario: [boton:datos_ok]
+<-- bot (step=confirmar_hard_pull):
+[BUTTONS] Para enviar tu expediente completo a *Banco Popular* y que ellos realicen el estudio oficial de aprobacion, responde *Autorizo al banco*.
+
+Por tu perfil, lo mas probable es que este banco pida una prima (enganche) mayor o un ajuste en el monto solicitado.
+  opciones: hard_si:Autorizo banco | duda:Tengo duda | hard_no:Ahora no
+
+[RESULTADO FINAL] step=confirmar_hard_pull nivel=2
+
+===== Conversacion: Nivel 3 (cliente prime) (cedula 1-0000-0000) =====
+
+--> usuario: ""
+<-- bot (step=pedir_producto):
+[BUTTONS] Hola. Soy *PreCali IA*, tu asesor de credito. Que queres simular hoy?
+  opciones: personal:Personal | vehiculo:Vehiculo | hipoteca:Vivienda
+
+--> usuario: [boton:personal]
+<-- bot (step=pedir_ingreso):
+[TEXT] Perfecto, *credito personal*.
+Para armar tu comparacion voy a pedirte los datos paso a paso.
+
+💰 *Fase 1/2: Ingreso*
+¿Cuanto es tu ingreso neto mensual exacto?
+
+--> usuario: "900000"
+<-- bot (step=pedir_deudas):
+[TEXT] 💳 *Fase 2/2: Deudas*
+¿Tenes alguna deuda mensual actual?
+Si tenes, escribi el monto exacto.
+Si no tenes deudas, escribi 0.
+
+--> usuario: "150000"
+<-- bot (step=post_resultado):
+[TEXT] Comparativa preliminar para prestamo personal:
+
+*Banco Popular*
+- Tasa: 15.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 730 650
+
+*Banco Nacional*
+- Tasa: 16.5% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 210 000/mes*
+- Monto maximo: CRC 8 541 960
+
+*Banco de Costa Rica*
+- Tasa: 17% anual | Plazo: 5 anos
+- Cuota estimada: *CRC 192 000/mes*
+- Monto maximo: CRC 7 725 557
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: "0"
+<-- bot (step=post_resultado):
+[TEXT] No pude buscar eso en este momento. Probemos de nuevo en unos minutos, o seguimos con la siguiente pregunta.
+[BUTTONS] Que queres hacer?
+  opciones: aplicar:Aplicar | requisitos:Requisitos | ahora_no:Ahora no
+
+--> usuario: [boton:aplicar]
+<-- bot (step=elegir_banco_aplicar):
+[BUTTONS] A que banco queres aplicar?
+  opciones: banco_0:Banco Popular | banco_1:Banco Nacional | banco_2:Banco de Costa Rica
+
+--> usuario: [boton:banco_0]
+<-- bot (step=lead_datos):
+[TEXT] Para preparar tu expediente para *Banco Popular*, necesito estos datos en un solo mensaje:
+Nombre completo
+Cedula o identificacion
+Correo electronico
+
+El telefono sera el mismo desde el que escribiste, salvo que indiques otro.
+
+Al enviarnos tu cedula autorizas a PreCali a consultar tu perfil crediticio con fines de precalificacion.
+
+--> usuario: "Juan Perez\n1-0000-0000\njuan@example.com"
+<-- bot (step=lead_fuente_ingresos):
+[BUTTONS] Cual es tu fuente principal de ingresos?
+  opciones: asalariado:Asalariado | independiente:Independiente | duda:Tengo duda
+
+[EVIDENCIA] session.buroResult.nivel = 3 (esperado: coincide con Nivel 3 (cliente prime))
+
+--> usuario: [boton:asalariado]
+<-- bot (step=esperar_documentos):
+[TEXT] Para enviar tu expediente a *Banco Popular*, subi por este chat:
+- Orden patronal o comprobantes de pago recientes.
+
+Cuando los recibamos, te pedire autorizacion para el estudio inicial gratuito de PreCali.
+
+--> usuario: "[DOCUMENTO_RECIBIDO]\ncomprobante de ingresos de prueba"
+<-- bot (step=autorizar_soft_precali):
+[BUTTONS] Recibi tus documentos. Para que PreCali realice el estudio crediticio inicial gratuito y cruce los datos, necesito tu autorizacion. Autorizas?
+  opciones: soft_precali_si:Si autorizo | duda:Tengo duda | soft_precali_no:Ahora no
+
+--> usuario: [boton:soft_precali_si]
+<-- bot (step=confirmar_datos_extraidos):
+[BUTTONS] Estudio inicial PreCali listo.
+Documento recibido. No pude leer todos los campos automaticamente.
+
+Confirmas que estos datos son correctos?
+  opciones: datos_ok:Correcto | datos_corregir:Corregir | duda:Tengo duda
+
+--> usuario: [boton:datos_ok]
+<-- bot (step=confirmar_hard_pull):
+[BUTTONS] Para enviar tu expediente completo a *Banco Popular* y que ellos realicen el estudio oficial de aprobacion, responde *Autorizo al banco*.
+  opciones: hard_si:Autorizo banco | duda:Tengo duda | hard_no:Ahora no
+
+[RESULTADO FINAL] step=confirmar_hard_pull nivel=3
