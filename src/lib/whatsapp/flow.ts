@@ -24,7 +24,7 @@ import { calcularPrecalificacion, consultarRequisitos, type CalcularResult, type
 import { resolverDuda, type ChatMessage } from "@/lib/whatsapp/agent";
 import { analyzeWithPreCaliAi, type NormalizedAiResult } from "@/lib/whatsapp/ai";
 import { generateMockBuroResponse } from "@/lib/buro/mock-equifax";
-import { calificarLead } from "@/lib/buro/engine";
+import { scoreLead } from "@/lib/buro/engine";
 
 const DEFAULT_CURRENCY: Record<string, string> = { CR: "CRC" };
 const COUNTRY_CURRENCIES: Record<string, string[]> = {
@@ -410,7 +410,7 @@ async function manejarDuda({ session, userText }: { session: Session; userText: 
       country: session.profile.country,
       step: session.step,
       profile: session.profile,
-      nivelRiesgo: session.buroResult?.nivel ?? null,
+      riskLevel: session.buroLevel ?? null,
     },
   });
   return { message: result.message, aiHistory: result.aiHistory };
@@ -740,13 +740,16 @@ async function stepLeadDatos({ session, bodyText }: { session: Session; bodyText
   }
 
   const buro = generateMockBuroResponse(parsed.idNumber, new Date().toISOString());
-  const buroResult = calificarLead(buro, session.profile);
+  // Only the level is persisted on the session (INV-4/CWE-359): the rest of the
+  // EngineResult (score, category, ratio, flags) is discarded to avoid retaining
+  // sensitive financial data in Upstash KV.
+  const buroLevel = scoreLead(buro, session.profile).level;
 
   const s: Session = {
     ...session,
     step: "lead_fuente_ingresos",
     lead: { ...(session.lead || LEAD_EMPTY), ...parsed },
-    buroResult,
+    buroLevel,
   };
   return {
     actions: [
@@ -891,7 +894,7 @@ async function stepCorregirDatosExtraidos({ session, bodyText }: { session: Sess
 }
 
 function goToHardPull(session: Session, bankName: string): HandleIncomingResult {
-  if (session.buroResult?.nivel === 1) {
+  if (session.buroLevel === 1) {
     return {
       actions: [
         actionTexto(
@@ -910,7 +913,7 @@ function goToHardPull(session: Session, bankName: string): HandleIncomingResult 
 
 function hardPullPrompt(session: Session): Action {
   const ajusteNota =
-    session.buroResult?.nivel === 2
+    session.buroLevel === 2
       ? "\n\nPor tu perfil, lo mas probable es que este banco pida una prima (enganche) mayor o un ajuste en el monto solicitado."
       : "";
   const body =

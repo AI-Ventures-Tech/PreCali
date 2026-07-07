@@ -167,7 +167,7 @@ export function defaultSession(): Session {
     lastResults: null,
     targetBank: null,
     lead: { ...DEFAULT_LEAD },
-    buroResult: null,
+    buroLevel: null,
     documentText: "",
     extractedSummary: "",
     correctionNote: "",

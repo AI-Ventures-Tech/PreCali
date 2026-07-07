@@ -1,19 +1,19 @@
-// Mock determinístico de una consulta de buró (Equifax / SUGEF ICIC) para Costa Rica.
-// No hay acceso real a la API todavía; este generador produce una respuesta plausible
-// y estable por cédula para poder desarrollar el motor calificador aguas abajo.
+// Deterministic mock of a credit bureau query (Equifax / SUGEF ICIC) for Costa Rica.
+// There is no real API access yet; this generator produces a plausible, stable-by-cédula
+// response so the downstream scoring engine can be developed.
 //
-// Determinismo: la misma `idNumber` produce siempre el mismo resultado byte a byte.
-// Se prohíbe Math.random / Date.now / new Date() dentro de la generación: la aleatoriedad
-// sale de un PRNG (mulberry32) sembrado con un hash FNV-1a de la cédula.
+// Determinism: the same `idNumber` always yields the same result, byte for byte.
+// Math.random / Date.now / new Date() are forbidden inside generation: randomness
+// comes from a mulberry32 PRNG seeded with an FNV-1a hash of the cédula.
 
 import type {
   BuroMockResponse,
-  ComportamientoPagoHistorico,
-  OperacionCredito,
-  SugefCategoria,
+  HistoricalPaymentBehavior,
+  CreditOperation,
+  SugefCategory,
 } from "@/types/buro";
 
-// Hash FNV-1a de 32 bits: convierte la cédula en una semilla entera determinística.
+// 32-bit FNV-1a hash: turns the cédula into a deterministic integer seed.
 function fnv1a(input: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
@@ -23,7 +23,7 @@ function fnv1a(input: string): number {
   return hash >>> 0;
 }
 
-// PRNG mulberry32: rápido, determinístico, sin dependencias. Devuelve floats en [0, 1).
+// mulberry32 PRNG: fast, deterministic, no dependencies. Returns floats in [0, 1).
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -43,49 +43,50 @@ function pick<T>(rng: () => number, arr: readonly T[]): T {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-function redondearMil(n: number): number {
+function roundToThousand(n: number): number {
   return Math.round(n / 1000) * 1000;
 }
 
-interface CategoriaPerfil {
-  categoria: SugefCategoria;
-  // Peso relativo en la distribución. A2/B1/B2 concentran la masa (población real cae
-  // en categorías intermedias); A1 y C2/D/E son colas chicas (prime y alto riesgo).
-  peso: number;
+interface CategoryProfile {
+  category: SugefCategory;
+  // Relative weight in the distribution. A2/B1/B2 hold the bulk of the mass (real
+  // population falls in the middle categories); A1 and C2/D/E are small tails (prime
+  // and high-risk respectively).
+  weight: number;
   scoreMin: number;
   scoreMax: number;
-  comportamientoBase: ComportamientoPagoHistorico;
-  probAtrasoOperacion: number; // prob. de que una operación tenga días de atraso
-  maxDiasAtraso: number;
-  minOperaciones: number;
-  moraGarantizada: boolean; // categorías malas deben mostrar al menos una mora activa
-  probShopping: number; // prob. de consultas altas en 30 días (shopping de crédito)
-  probProtesto: number; // prob. de protestos comerciales
+  baseBehavior: HistoricalPaymentBehavior;
+  probOperationPastDue: number; // probability that an operation has past-due days
+  maxDaysPastDue: number;
+  minOperations: number;
+  guaranteedDefault: boolean; // bad categories must show at least one active default
+  probShopping: number; // probability of high inquiries in 30 days (credit shopping)
+  probProtest: number; // probability of commercial protests
 }
 
-// Pesos: A2(18)+B1(22)+B2(20)=60 de masa central; A1(5) cola prime;
-// C1(14)+C2(10)+D(7)+E(4)=35 cola de riesgo creciente. Total 100.
-const PERFILES: readonly CategoriaPerfil[] = [
-  { categoria: "A1", peso: 5, scoreMin: 800, scoreMax: 850, comportamientoBase: 1, probAtrasoOperacion: 0.02, maxDiasAtraso: 15, minOperaciones: 0, moraGarantizada: false, probShopping: 0.05, probProtesto: 0.02 },
-  { categoria: "A2", peso: 18, scoreMin: 740, scoreMax: 810, comportamientoBase: 1, probAtrasoOperacion: 0.05, maxDiasAtraso: 20, minOperaciones: 0, moraGarantizada: false, probShopping: 0.08, probProtesto: 0.03 },
-  { categoria: "B1", peso: 22, scoreMin: 680, scoreMax: 750, comportamientoBase: 1, probAtrasoOperacion: 0.12, maxDiasAtraso: 30, minOperaciones: 0, moraGarantizada: false, probShopping: 0.12, probProtesto: 0.05 },
-  { categoria: "B2", peso: 20, scoreMin: 620, scoreMax: 690, comportamientoBase: 2, probAtrasoOperacion: 0.22, maxDiasAtraso: 45, minOperaciones: 0, moraGarantizada: false, probShopping: 0.18, probProtesto: 0.08 },
-  { categoria: "C1", peso: 14, scoreMin: 540, scoreMax: 630, comportamientoBase: 2, probAtrasoOperacion: 0.45, maxDiasAtraso: 75, minOperaciones: 1, moraGarantizada: true, probShopping: 0.28, probProtesto: 0.15 },
-  { categoria: "C2", peso: 10, scoreMin: 460, scoreMax: 550, comportamientoBase: 2, probAtrasoOperacion: 0.6, maxDiasAtraso: 110, minOperaciones: 1, moraGarantizada: true, probShopping: 0.38, probProtesto: 0.22 },
-  { categoria: "D", peso: 7, scoreMin: 380, scoreMax: 470, comportamientoBase: 3, probAtrasoOperacion: 0.75, maxDiasAtraso: 150, minOperaciones: 1, moraGarantizada: true, probShopping: 0.48, probProtesto: 0.3 },
-  { categoria: "E", peso: 4, scoreMin: 300, scoreMax: 390, comportamientoBase: 3, probAtrasoOperacion: 0.9, maxDiasAtraso: 180, minOperaciones: 1, moraGarantizada: true, probShopping: 0.55, probProtesto: 0.4 },
+// Weights: A2(18)+B1(22)+B2(20)=60 of central mass; A1(5) prime tail;
+// C1(14)+C2(10)+D(7)+E(4)=35 of increasing-risk tail. Total 100.
+const CATEGORY_PROFILES: readonly CategoryProfile[] = [
+  { category: "A1", weight: 5, scoreMin: 800, scoreMax: 850, baseBehavior: 1, probOperationPastDue: 0.02, maxDaysPastDue: 15, minOperations: 0, guaranteedDefault: false, probShopping: 0.05, probProtest: 0.02 },
+  { category: "A2", weight: 18, scoreMin: 740, scoreMax: 810, baseBehavior: 1, probOperationPastDue: 0.05, maxDaysPastDue: 20, minOperations: 0, guaranteedDefault: false, probShopping: 0.08, probProtest: 0.03 },
+  { category: "B1", weight: 22, scoreMin: 680, scoreMax: 750, baseBehavior: 1, probOperationPastDue: 0.12, maxDaysPastDue: 30, minOperations: 0, guaranteedDefault: false, probShopping: 0.12, probProtest: 0.05 },
+  { category: "B2", weight: 20, scoreMin: 620, scoreMax: 690, baseBehavior: 2, probOperationPastDue: 0.22, maxDaysPastDue: 45, minOperations: 0, guaranteedDefault: false, probShopping: 0.18, probProtest: 0.08 },
+  { category: "C1", weight: 14, scoreMin: 540, scoreMax: 630, baseBehavior: 2, probOperationPastDue: 0.45, maxDaysPastDue: 75, minOperations: 1, guaranteedDefault: true, probShopping: 0.28, probProtest: 0.15 },
+  { category: "C2", weight: 10, scoreMin: 460, scoreMax: 550, baseBehavior: 2, probOperationPastDue: 0.6, maxDaysPastDue: 110, minOperations: 1, guaranteedDefault: true, probShopping: 0.38, probProtest: 0.22 },
+  { category: "D", weight: 7, scoreMin: 380, scoreMax: 470, baseBehavior: 3, probOperationPastDue: 0.75, maxDaysPastDue: 150, minOperations: 1, guaranteedDefault: true, probShopping: 0.48, probProtest: 0.3 },
+  { category: "E", weight: 4, scoreMin: 300, scoreMax: 390, baseBehavior: 3, probOperationPastDue: 0.9, maxDaysPastDue: 180, minOperations: 1, guaranteedDefault: true, probShopping: 0.55, probProtest: 0.4 },
 ];
 
-const TIPOS_OPERACION = ["hipotecario", "prendario", "personal", "tarjeta"] as const;
+const OPERATION_TYPES = ["hipotecario", "prendario", "personal", "tarjeta"] as const;
 
-const RANGO_MONTO: Record<OperacionCredito["tipo"], readonly [number, number]> = {
+const AMOUNT_RANGES: Record<CreditOperation["type"], readonly [number, number]> = {
   hipotecario: [15_000_000, 80_000_000],
   prendario: [3_000_000, 20_000_000],
   personal: [500_000, 8_000_000],
   tarjeta: [100_000, 3_000_000],
 };
 
-const ENTIDADES = [
+const INSTITUTIONS = [
   "Banco Nacional",
   "Banco de Costa Rica",
   "BAC Credomatic",
@@ -98,95 +99,95 @@ const ENTIDADES = [
   "Financiera Desyfin",
 ] as const;
 
-function pickCategoria(rng: () => number): CategoriaPerfil {
-  const totalPeso = PERFILES.reduce((sum, p) => sum + p.peso, 0);
-  let r = rng() * totalPeso;
-  for (const perfil of PERFILES) {
-    r -= perfil.peso;
-    if (r < 0) return perfil;
+function pickCategory(rng: () => number): CategoryProfile {
+  const totalWeight = CATEGORY_PROFILES.reduce((sum, p) => sum + p.weight, 0);
+  let r = rng() * totalWeight;
+  for (const profile of CATEGORY_PROFILES) {
+    r -= profile.weight;
+    if (r < 0) return profile;
   }
-  return PERFILES[PERFILES.length - 1];
+  return CATEGORY_PROFILES[CATEGORY_PROFILES.length - 1];
 }
 
-// Comportamiento base con jitter acotado a ±1 (se mantiene coherente con la categoría).
-function derivarComportamiento(
+// Base behavior with bounded jitter of ±1 (stays coherent with the category).
+function deriveBehavior(
   rng: () => number,
-  base: ComportamientoPagoHistorico,
-): ComportamientoPagoHistorico {
+  base: HistoricalPaymentBehavior,
+): HistoricalPaymentBehavior {
   if (rng() < 0.15) {
     const shifted = base + (rng() < 0.5 ? -1 : 1);
-    return Math.min(3, Math.max(1, shifted)) as ComportamientoPagoHistorico;
+    return Math.min(3, Math.max(1, shifted)) as HistoricalPaymentBehavior;
   }
   return base;
 }
 
-function generarOperacion(
+function generateOperation(
   rng: () => number,
-  perfil: CategoriaPerfil,
-): OperacionCredito {
-  const tipo = pick(rng, TIPOS_OPERACION);
-  const [minMonto, maxMonto] = RANGO_MONTO[tipo];
-  const cancelada = rng() < 0.2;
-  const tieneAtraso = !cancelada && rng() < perfil.probAtrasoOperacion;
-  const diasAtraso = tieneAtraso ? randInt(rng, 1, perfil.maxDiasAtraso) : 0;
-  const montoAdeudado = cancelada ? 0 : redondearMil(randInt(rng, minMonto, maxMonto));
-  return { tipo, entidad: pick(rng, ENTIDADES), montoAdeudado, diasAtraso, cancelada };
+  profile: CategoryProfile,
+): CreditOperation {
+  const type = pick(rng, OPERATION_TYPES);
+  const [minAmount, maxAmount] = AMOUNT_RANGES[type];
+  const closed = rng() < 0.2;
+  const hasPastDue = !closed && rng() < profile.probOperationPastDue;
+  const daysPastDue = hasPastDue ? randInt(rng, 1, profile.maxDaysPastDue) : 0;
+  const amountOwed = closed ? 0 : roundToThousand(randInt(rng, minAmount, maxAmount));
+  return { type, institution: pick(rng, INSTITUTIONS), amountOwed, daysPastDue, closed };
 }
 
 export function generateMockBuroResponse(
   idNumber: string,
-  fechaConsulta: string,
+  inquiryDate: string,
 ): BuroMockResponse {
   const rng = mulberry32(fnv1a(idNumber));
 
-  const perfil = pickCategoria(rng);
-  const categoriaSugef = perfil.categoria;
-  const score = randInt(rng, perfil.scoreMin, perfil.scoreMax);
-  const comportamientoPagoHistorico = derivarComportamiento(rng, perfil.comportamientoBase);
+  const profile = pickCategory(rng);
+  const sugefCategory = profile.category;
+  const score = randInt(rng, profile.scoreMin, profile.scoreMax);
+  const historicalPaymentBehavior = deriveBehavior(rng, profile.baseBehavior);
 
-  const numOperaciones = randInt(rng, perfil.minOperaciones, 4);
-  const operaciones: OperacionCredito[] = [];
-  for (let i = 0; i < numOperaciones; i++) {
-    operaciones.push(generarOperacion(rng, perfil));
+  const numOperations = randInt(rng, profile.minOperations, 4);
+  const operations: CreditOperation[] = [];
+  for (let i = 0; i < numOperations; i++) {
+    operations.push(generateOperation(rng, profile));
   }
 
-  // Coherencia: una categoría mala debe reflejar al menos una mora activa.
-  if (perfil.moraGarantizada && operaciones.length > 0) {
-    const tieneMoraActiva = operaciones.some((o) => !o.cancelada && o.diasAtraso > 0);
-    if (!tieneMoraActiva) {
-      let target = operaciones.find((o) => !o.cancelada);
+  // Coherence: a bad category must reflect at least one active default.
+  if (profile.guaranteedDefault && operations.length > 0) {
+    const hasActiveDefault = operations.some((o) => !o.closed && o.daysPastDue > 0);
+    if (!hasActiveDefault) {
+      let target = operations.find((o) => !o.closed);
       if (!target) {
-        target = operaciones[0];
-        target.cancelada = false;
-        const [minMonto, maxMonto] = RANGO_MONTO[target.tipo];
-        target.montoAdeudado = redondearMil(randInt(rng, minMonto, maxMonto));
+        target = operations[0];
+        target.closed = false;
+        const [minAmount, maxAmount] = AMOUNT_RANGES[target.type];
+        target.amountOwed = roundToThousand(randInt(rng, minAmount, maxAmount));
       }
-      target.diasAtraso = randInt(rng, Math.max(1, Math.floor(perfil.maxDiasAtraso / 2)), perfil.maxDiasAtraso);
+      target.daysPastDue = randInt(rng, Math.max(1, Math.floor(profile.maxDaysPastDue / 2)), profile.maxDaysPastDue);
     }
   }
 
-  const montoTotalAdeudado = operaciones.reduce((sum, o) => sum + o.montoAdeudado, 0);
+  const totalAmountOwed = operations.reduce((sum, o) => sum + o.amountOwed, 0);
 
-  // Consultas en 30 días sesgadas fuerte hacia 0; las categorías de riesgo pueden
-  // mostrar shopping de crédito (varias consultas recientes).
-  let entidadesConsultantesUltimos30Dias = Math.floor(rng() * rng() * 5);
-  if (rng() < perfil.probShopping) {
-    entidadesConsultantesUltimos30Dias += randInt(rng, 2, 4);
+  // Inquiries in the last 30 days are heavily skewed toward 0; risk categories may
+  // show credit shopping (multiple recent inquiries).
+  let inquiriesLast30Days = Math.floor(rng() * rng() * 5);
+  if (rng() < profile.probShopping) {
+    inquiriesLast30Days += randInt(rng, 2, 4);
   }
-  entidadesConsultantesUltimos30Dias = Math.min(8, entidadesConsultantesUltimos30Dias);
+  inquiriesLast30Days = Math.min(8, inquiriesLast30Days);
 
-  const protestosComerciales = rng() < perfil.probProtesto ? randInt(rng, 1, 2) : 0;
+  const commercialProtests = rng() < profile.probProtest ? randInt(rng, 1, 2) : 0;
 
   return {
     idNumber,
     score,
-    categoriaSugef,
-    comportamientoPagoHistorico,
-    operaciones,
-    montoTotalAdeudado,
-    entidadesConsultantesUltimos30Dias,
-    protestosComerciales,
-    historialMeses: 48,
-    fechaConsulta,
+    sugefCategory,
+    historicalPaymentBehavior,
+    operations,
+    totalAmountOwed,
+    inquiriesLast30Days,
+    commercialProtests,
+    historyMonths: 48,
+    inquiryDate,
   };
 }

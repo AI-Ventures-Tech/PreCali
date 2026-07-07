@@ -48,11 +48,11 @@ export interface ResolverDudaContext {
   country: string;
   step: string;
   profile: object;
-  // Nivel de riesgo del motor calificador (1/2/3), o null/undefined si todavia
-  // no se hizo la consulta de buro. Solo se usa este numero para modular el
-  // tono: nunca pasar aca el score, categoriaSugef ni el resto del payload
-  // del buro (CWE-200, dato financiero simulado sensible).
-  nivelRiesgo?: 1 | 2 | 3 | null;
+  // Risk level from the scoring engine (1/2/3), or null/undefined if the bureau
+  // query has not run yet. Only this number is used to modulate tone: never pass
+  // the score, sugefCategory, or any other raw bureau payload here (CWE-200 —
+  // sensitive simulated financial data).
+  riskLevel?: 1 | 2 | 3 | null;
 }
 
 export interface ResolverDudaResult {
@@ -83,13 +83,13 @@ CONTEXTO ACTUAL DE LA PERSONA
 - Pais: {{COUNTRY}}
 - Paso actual del flujo guiado: {{STEP}}
 - Perfil ya conocido: {{PROFILE_JSON}}
-{{NIVEL_RIESGO}}`;
+{{RISK_LEVEL}}`;
 
-// Modula el tono segun el nivel de riesgo del motor calificador (1/2/3).
-// SEGURIDAD: solo consume el numero de nivel. Nunca interpolar aca el score,
-// categoriaSugef, operaciones ni ningun otro campo del buro (CWE-200).
-function nivelRiesgoInstruccion(nivel: ResolverDudaContext["nivelRiesgo"]): string {
-  switch (nivel) {
+// Modulates tone based on the scoring engine's risk level (1/2/3).
+// SECURITY: consumes only the level number. Never interpolate the score,
+// sugefCategory, operations, or any other bureau field here (CWE-200).
+function riskLevelInstruction(level: ResolverDudaContext["riskLevel"]): string {
+  switch (level) {
     case 1:
       return "- Nivel de riesgo: 1 (alto riesgo). No vendas productos bancarios ni empujes a aplicar a ningun banco: rol educativo y empatico, guiando un plan de saneamiento crediticio a 6 meses.";
     case 2:
@@ -114,7 +114,7 @@ export function buildSystemPrompt(context: ResolverDudaContext | null | undefine
   return SYSTEM_PROMPT_TEMPLATE.replace("{{COUNTRY}}", c.country || "no identificado")
     .replace("{{STEP}}", c.step || "inicio")
     .replace("{{PROFILE_JSON}}", JSON.stringify(c.profile || {}))
-    .replace("{{NIVEL_RIESGO}}", nivelRiesgoInstruccion(c.nivelRiesgo));
+    .replace("{{RISK_LEVEL}}", riskLevelInstruction(c.riskLevel));
 }
 
 function safeJsonParse(value: string | null | undefined): unknown {

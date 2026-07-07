@@ -1,10 +1,11 @@
-// Chat de prueba local para el bot de WhatsApp de PreCali, sin Twilio ni WhatsApp real.
-// Uso: npx tsx scripts/probar-bot.ts   (o: npm run probar-bot)
+// Local test chat for the PreCali WhatsApp bot, without real Twilio or WhatsApp.
+// Usage: npx tsx scripts/probar-bot.ts   (or: npm run probar-bot)
 //
-// Simula la conversacion completa en la terminal usando el mismo motor (`handleIncoming`)
-// que usa el webhook real. Sirve para probar a mano el motor calificador: escribi una
-// cedula distinta en cada corrida y fijate que nivel de riesgo le asigna y como cambia
-// el mensaje del bot (rescate en Nivel 1, nota de prima en Nivel 2, oferta directa en Nivel 3).
+// Simulates the full conversation in the terminal using the same engine
+// (`handleIncoming`) as the real webhook. Useful for manually testing the scoring
+// engine: type a different cédula on each run and observe which risk level it
+// gets assigned and how the bot's message changes (rescue flow on Level 1, prima
+// note on Level 2, direct offer on Level 3).
 
 import * as readline from "node:readline";
 import { handleIncoming } from "../src/lib/whatsapp/flow";
@@ -24,8 +25,8 @@ function printActions(actions: Action[]): void {
       lastButtons = [];
     }
   }
-  if (session.buroResult) {
-    console.log(`\n   [debug] nivel de riesgo asignado: ${session.buroResult.nivel} (categoria ${session.buroResult.categoriaSugef})`);
+  if (session.buroLevel) {
+    console.log(`\n   [debug] nivel de riesgo asignado: ${session.buroLevel}`);
   }
 }
 
@@ -43,8 +44,8 @@ async function respond(bodyText: string, buttonPayload: string): Promise<void> {
   rl.prompt();
 }
 
-// readline emite cada linea sin esperar a que termine la anterior; encolamos para
-// procesar una a la vez y evitar que dos respuestas async pisen la sesion en curso.
+// readline emits each line without waiting for the previous one to finish; we queue
+// them to process one at a time and avoid two async responses racing on the session.
 let queue: Promise<void> = Promise.resolve();
 
 async function handleLine(lineRaw: string): Promise<void> {
@@ -66,9 +67,9 @@ async function handleLine(lineRaw: string): Promise<void> {
     await respond("", line);
     return;
   }
-  // El paso de datos del lead pide nombre+cedula+correo en UN solo mensaje con saltos
-  // de linea reales (como en WhatsApp). En la terminal escribi "\n" literal donde iria
-  // el salto de linea, ej: Juan Perez\n1-2345-6789\njuan@example.com
+  // The lead-data step asks for name+cédula+email in ONE message with real line
+  // breaks (just like WhatsApp). In the terminal, type "\n" literally where the
+  // line break should go, e.g.: Juan Perez\n1-2345-6789\njuan@example.com
   await respond(line.replace(/\\n/g, "\n"), "");
 }
 

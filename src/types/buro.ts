@@ -1,49 +1,53 @@
-// Tipos de dominio para el motor calificador con mock de buró (Equifax/SUGEF ICIC).
-// Ver plans/2026-07-02-motor-calificador-buro-mock/plan.md para el contexto de negocio.
+// Domain types for the credit bureau mock + scoring engine (Equifax/SUGEF ICIC).
+// See plans/2026-07-02-motor-calificador-buro-mock/plan.md for business context.
+//
+// Naming: identifiers (types, fields, functions) are English; string ENUM VALUES
+// ("hipotecario" | "prendario" | "personal" | "tarjeta") stay Spanish because they
+// are domain data tied to the Costa Rican financial system, not code.
 
-export type SugefCategoria = "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "D" | "E";
+export type SugefCategory = "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "D" | "E";
 
-/** 1=bueno 2=aceptable 3=deficiente */
-export type ComportamientoPagoHistorico = 1 | 2 | 3;
+/** 1 = good, 2 = acceptable, 3 = poor. */
+export type HistoricalPaymentBehavior = 1 | 2 | 3;
 
-export interface OperacionCredito {
-  tipo: "hipotecario" | "prendario" | "personal" | "tarjeta";
-  entidad: string;
-  montoAdeudado: number;
-  diasAtraso: number;
-  cancelada: boolean;
+export interface CreditOperation {
+  type: "hipotecario" | "prendario" | "personal" | "tarjeta";
+  institution: string;
+  amountOwed: number;
+  daysPastDue: number;
+  closed: boolean;
 }
 
 export interface BuroMockResponse {
   idNumber: string;
   score: number;
-  categoriaSugef: SugefCategoria;
-  comportamientoPagoHistorico: ComportamientoPagoHistorico;
-  operaciones: OperacionCredito[];
-  montoTotalAdeudado: number;
-  entidadesConsultantesUltimos30Dias: number;
-  protestosComerciales: number;
-  historialMeses: 48;
-  fechaConsulta: string;
+  sugefCategory: SugefCategory;
+  historicalPaymentBehavior: HistoricalPaymentBehavior;
+  operations: CreditOperation[];
+  totalAmountOwed: number;
+  inquiriesLast30Days: number;
+  commercialProtests: number;
+  historyMonths: 48;
+  inquiryDate: string;
 }
 
-export type NivelCalificacion = 1 | 2 | 3;
+export type RiskLevel = 1 | 2 | 3;
 
 export interface EngineConfig {
   scorePrimeThreshold: number;
-  ratioDeudaIngresoAlerta: number;
-  ratioDeudaIngresoPrecalificado: number;
-  moraActivaDiasLimite: number;
-  shoppingCreditoConsultas30d: number;
+  debtToIncomeAlertThreshold: number;
+  debtToIncomePrequalifiedThreshold: number;
+  activeDefaultDaysLimit: number;
+  shoppingInquiriesThreshold: number;
 }
 
 export interface EngineResult {
-  nivel: NivelCalificacion;
-  categoriaSugef: SugefCategoria;
+  level: RiskLevel;
+  sugefCategory: SugefCategory;
   score: number;
-  ratioDeudaIngreso: number;
-  moraActivaSevera: boolean;
-  shoppingCredito: boolean;
-  ratioAlto: boolean;
-  motivo: string;
+  debtToIncomeRatio: number;
+  hasSevereActiveDefault: boolean;
+  isCreditShopping: boolean;
+  hasHighDebtRatio: boolean;
+  reason: string;
 }

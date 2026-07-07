@@ -23,7 +23,7 @@ function req(body: unknown, opts: { ip?: string; apiKey?: string } = {}): Reques
 describe("POST /api/buro", () => {
   beforeEach(() => {
     resetRateLimiter();
-    // Sin env var por defecto → endpoint público en estos tests.
+    // No env var by default → public endpoint in these tests.
     vi.stubEnv("PRECALI_BURO_API_KEY", "");
   });
 
@@ -39,14 +39,14 @@ describe("POST /api/buro", () => {
     expect(json.ok).toBe(true);
     expect(json.data).toMatchObject({
       idNumber: "1-2345-6789",
-      historialMeses: 48,
+      historyMonths: 48,
     });
     expect(["A1", "A2", "B1", "B2", "C1", "C2", "D", "E"]).toContain(
-      json.data.categoriaSugef,
+      json.data.sugefCategory,
     );
     expect(json.data.score).toBeGreaterThanOrEqual(300);
     expect(json.data.score).toBeLessThanOrEqual(850);
-    expect(Array.isArray(json.data.operaciones)).toBe(true);
+    expect(Array.isArray(json.data.operations)).toBe(true);
   });
 
   it("is deterministic — same idNumber yields the same response byte to byte", async () => {
@@ -54,9 +54,9 @@ describe("POST /api/buro", () => {
     const b = await POST(req({ idNumber: "2-0000-0001" }));
     const ja = await a.json();
     const jb = await b.json();
-    // fechaConsulta cambia entre llamadas → se omite de la comparación.
-    const { fechaConsulta: _fa, ...restA } = ja.data;
-    const { fechaConsulta: _fb, ...restB } = jb.data;
+    // inquiryDate changes between calls → omitted from the comparison.
+    const { inquiryDate: _fa, ...restA } = ja.data;
+    const { inquiryDate: _fb, ...restB } = jb.data;
     expect(restA).toEqual(restB);
   });
 
@@ -89,9 +89,9 @@ describe("POST /api/buro", () => {
     expect(spy).toHaveBeenCalledOnce();
     const [tag, payload] = spy.mock.calls[0]!;
     expect(tag).toBe("[buro]");
-    // El log lleva categoria/score/ts pero nunca la cédula ni el payload crudo.
+    // The log carries category/score/ts but never the cédula or raw payload.
     expect(payload).not.toHaveProperty("idNumber");
-    expect(payload).not.toHaveProperty("operaciones");
+    expect(payload).not.toHaveProperty("operations");
     expect(JSON.stringify(payload)).not.toContain("3-9999-9999");
   });
 

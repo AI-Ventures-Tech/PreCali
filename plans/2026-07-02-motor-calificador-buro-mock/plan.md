@@ -319,3 +319,13 @@ simulación de bancos). Quedan dos preguntas abiertas, ninguna bloqueante:
   completo en `evidence/exercise-conversation-log.txt`. Nivel 1 → mensaje de rescate y sesión pausada,
   sin botón "Autorizo banco"; Nivel 2 → hard pull con nota de prima/ajuste; Nivel 3 → hard pull limpio,
   igual que el comportamiento previo al cambio. `npm test` 63/63 verde.
+- 2026-07-07 - `/vet` ronda 3 (fresh Agent, codex con sesión caída) → **HOLD** por violación real de
+  INV-4 (CWE-359): el plan afirmaba que ni `BuroMockResponse` ni `EngineResult` se persistían, pero
+  `memory.ts::saveSession` serializaba la sesión completa (incluyendo `buroResult` con score,
+  categoriaSugef, ratio) a Upstash KV por 30 días en cada turno del webhook. Fix aplicado: refactor
+  `session.buroResult: EngineResult | null` → `session.buroNivel: NivelCalificacion | null`. Solo el
+  nivel (1/2/3) se persiste; el resto del `EngineResult` se calcula en `stepLeadDatos` y se descarta
+  antes del `saveSession`. El bot sigue funcional entre turnos porque solo lee `.nivel` en
+  `manejarDuda`/`goToHardPull`/`hardPullPrompt`. 73/73 verde, typecheck y lint limpios. Dos LOW no
+  bloqueantes quedan pendientes: extraer `clientIp`/`json` compartidos entre routes, y decidir si
+  `scripts/find-cedulas.ts` se borra (parece superseded por `find-cedulas-perfiles.ts`).

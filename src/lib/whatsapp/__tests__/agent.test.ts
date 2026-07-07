@@ -3,38 +3,39 @@ import { buildSystemPrompt } from "@/lib/whatsapp/agent";
 
 const BASE_CONTEXT = { country: "cr", step: "post_resultado", profile: { income: 800000 } };
 
-describe("whatsapp/agent buildSystemPrompt — tono por nivel de riesgo", () => {
-  it("sin nivelRiesgo (null/undefined) no agrega ninguna instruccion de nivel", () => {
+describe("whatsapp/agent buildSystemPrompt — tone by risk level", () => {
+  it("without riskLevel (null/undefined) adds no level instruction", () => {
     const prompt = buildSystemPrompt(BASE_CONTEXT);
     expect(prompt).not.toContain("Nivel de riesgo");
   });
 
-  it("nivel 1 instruye no vender banco y guiar saneamiento a 6 meses", () => {
-    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, nivelRiesgo: 1 });
+  it("level 1 instructs not to sell bank products and guide a 6-month rehabilitation plan", () => {
+    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, riskLevel: 1 });
     expect(prompt).toContain("Nivel de riesgo: 1");
     expect(prompt).toContain("No vendas productos bancarios");
     expect(prompt).toContain("6 meses");
   });
 
-  it("nivel 2 instruye prima/monto ajustado y priorizar cooperativas", () => {
-    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, nivelRiesgo: 2 });
+  it("level 2 instructs adjusted prima/amount and prioritizes cooperatives", () => {
+    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, riskLevel: 2 });
     expect(prompt).toContain("Nivel de riesgo: 2");
     expect(prompt).toContain("prima");
     expect(prompt).toContain("cooperativas");
   });
 
-  it("nivel 3 instruye conversion rapida y mejores tasas", () => {
-    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, nivelRiesgo: 3 });
+  it("level 3 instructs fast conversion and best rates", () => {
+    const prompt = buildSystemPrompt({ ...BASE_CONTEXT, riskLevel: 3 });
     expect(prompt).toContain("Nivel de riesgo: 3");
     expect(prompt).toContain("conversion rapida");
   });
 
-  it("nunca filtra campos crudos del buro (score, categoriaSugef, operaciones, protestos)", () => {
-    // ResolverDudaContext solo tiene nivelRiesgo (numero), asi que estructuralmente no hay forma
-    // de que un campo crudo del buro llegue aca. Este test documenta y fija ese invariante.
-    for (const nivel of [1, 2, 3] as const) {
-      const prompt = buildSystemPrompt({ ...BASE_CONTEXT, nivelRiesgo: nivel });
-      expect(prompt).not.toMatch(/categoriaSugef|protestosComerciales|montoTotalAdeudado|entidadesConsultantes/i);
+  it("never leaks raw bureau fields (score, sugefCategory, operations, protests)", () => {
+    // ResolverDudaContext only carries riskLevel (a number), so structurally there
+    // is no way for a raw bureau field to reach here. This test documents and
+    // pins that invariant.
+    for (const level of [1, 2, 3] as const) {
+      const prompt = buildSystemPrompt({ ...BASE_CONTEXT, riskLevel: level });
+      expect(prompt).not.toMatch(/sugefCategory|commercialProtests|totalAmountOwed|inquiriesLast30Days/i);
     }
   });
 });

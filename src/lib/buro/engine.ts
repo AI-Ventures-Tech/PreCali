@@ -1,5 +1,5 @@
-// Motor calificador de leads a partir del mock de buró (Equifax/SUGEF ICIC).
-// La precedencia de reglas está fijada por negocio; ver plan S3. No reinterpretar el orden.
+// Lead scoring engine based on the credit bureau mock (Equifax/SUGEF ICIC).
+// Rule precedence is fixed by business — see plan subtask S3. Do not reinterpret the order.
 
 import type {
   BuroMockResponse,
@@ -10,13 +10,13 @@ import type { Profile } from "@/lib/whatsapp/types";
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   scorePrimeThreshold: 700,
-  ratioDeudaIngresoAlerta: 0.5,
-  ratioDeudaIngresoPrecalificado: 0.45,
-  moraActivaDiasLimite: 90,
-  shoppingCreditoConsultas30d: 5,
+  debtToIncomeAlertThreshold: 0.5,
+  debtToIncomePrequalifiedThreshold: 0.45,
+  activeDefaultDaysLimit: 90,
+  shoppingInquiriesThreshold: 5,
 };
 
-const CATEGORIAS_NIVEL_1 = new Set(["B2", "C1", "C2", "D", "E"]);
+const HIGH_RISK_CATEGORIES = new Set(["B2", "C1", "C2", "D", "E"]);
 
 function mergeConfig(config?: Partial<EngineConfig>): EngineConfig {
   const merged = { ...DEFAULT_ENGINE_CONFIG };
@@ -30,59 +30,59 @@ function mergeConfig(config?: Partial<EngineConfig>): EngineConfig {
   return merged;
 }
 
-export function calificarLead(
+export function scoreLead(
   buro: BuroMockResponse,
   profile: Pick<Profile, "income" | "debt">,
   config?: Partial<EngineConfig>,
 ): EngineResult {
   const cfg = mergeConfig(config);
 
-  const ratioDeudaIngreso = profile.debt / Math.max(1, profile.income);
-  const ratioAlto = ratioDeudaIngreso > cfg.ratioDeudaIngresoAlerta;
-  const shoppingCredito =
-    buro.entidadesConsultantesUltimos30Dias > cfg.shoppingCreditoConsultas30d;
+  const debtToIncomeRatio = profile.debt / Math.max(1, profile.income);
+  const hasHighDebtRatio = debtToIncomeRatio > cfg.debtToIncomeAlertThreshold;
+  const isCreditShopping =
+    buro.inquiriesLast30Days > cfg.shoppingInquiriesThreshold;
 
-  const moraActivaSevera = buro.operaciones.some(
-    (op) => op.diasAtraso > cfg.moraActivaDiasLimite,
+  const hasSevereActiveDefault = buro.operations.some(
+    (op) => op.daysPastDue > cfg.activeDefaultDaysLimit,
   );
 
-  let nivel: EngineResult["nivel"];
-  let motivo: string;
+  let level: EngineResult["level"];
+  let reason: string;
 
-  if (moraActivaSevera) {
-    // Regla 1: override duro, pisa categoría y score.
-    nivel = 1;
-    motivo = "mora activa > 90 dias";
-  } else if (CATEGORIAS_NIVEL_1.has(buro.categoriaSugef)) {
-    // Regla 2: B2 cuenta como Nivel 1 (alto riesgo), no Nivel 2.
-    nivel = 1;
-    motivo = "categoria B2/C1-E";
+  if (hasSevereActiveDefault) {
+    // Rule 1: hard override — trumps category and score.
+    level = 1;
+    reason = "active default > 90 days";
+  } else if (HIGH_RISK_CATEGORIES.has(buro.sugefCategory)) {
+    // Rule 2: B2 counts as Level 1 (high risk), not Level 2.
+    level = 1;
+    reason = "SUGEF category B2/C1-E";
   } else if (
     buro.score >= cfg.scorePrimeThreshold &&
-    ratioDeudaIngreso <= cfg.ratioDeudaIngresoPrecalificado
+    debtToIncomeRatio <= cfg.debtToIncomePrequalifiedThreshold
   ) {
-    // Regla 3: categoría A1/A2/B1 + score y ratio dentro de umbral.
-    nivel = 3;
-    motivo = "categoria prime, score y ratio dentro de umbral";
+    // Rule 3: category A1/A2/B1 with score and ratio inside thresholds.
+    level = 3;
+    reason = "prime category, score and ratio within thresholds";
   } else {
-    // Regla 4: categoría buena pero score o ratio insuficiente.
-    nivel = 2;
-    motivo = "categoria buena pero score/ratio insuficiente";
+    // Rule 4: good category but score or ratio insufficient.
+    level = 2;
+    reason = "good category but score/ratio insufficient";
   }
 
-  // Regla 5 (cap): ratio por encima de la alerta nunca permite Nivel 3.
-  if (ratioAlto && nivel === 3) {
-    nivel = 2;
+  // Rule 5 (cap): ratio above alert never allows Level 3.
+  if (hasHighDebtRatio && level === 3) {
+    level = 2;
   }
 
   return {
-    nivel,
-    categoriaSugef: buro.categoriaSugef,
+    level,
+    sugefCategory: buro.sugefCategory,
     score: buro.score,
-    ratioDeudaIngreso,
-    moraActivaSevera,
-    shoppingCredito,
-    ratioAlto,
-    motivo,
+    debtToIncomeRatio,
+    hasSevereActiveDefault,
+    isCreditShopping,
+    hasHighDebtRatio,
+    reason,
   };
 }

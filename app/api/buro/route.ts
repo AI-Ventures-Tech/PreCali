@@ -1,18 +1,19 @@
-// PreCali — Route Handler para consulta de buró (mock Equifax/SUGEF ICIC).
-// Hoy sirve el mock determinístico; mañana envuelve el cliente real de Equifax.
-// La firma HTTP (POST /api/buro con { idNumber }) se mantiene estable en el swap.
+// PreCali — Route Handler for credit bureau queries (mock Equifax/SUGEF ICIC).
+// Today it serves the deterministic mock; tomorrow the same contract wraps the real
+// Equifax client. The HTTP signature (POST /api/buro with { idNumber }) stays
+// stable across the swap.
 //
-// Seguridad:
-//   - Auth opcional vía PRECALI_BURO_API_KEY (CWE-306). Sin la env var, el
-//     endpoint es público (modo desarrollo). En producción, setear la var y
-//     exigir header `x-api-key` coincidente (comparación timing-safe).
-//   - Rate-limit por IP (CWE-770), reutilizando el bucket de /api/lead.
-//   - CWE-532: nunca loguear la cédula cruda ni el payload del buró.
+// Security:
+//   - Optional auth via PRECALI_BURO_API_KEY (CWE-306). Without the env var, the
+//     endpoint is public (development mode). In production, set the var and
+//     require a matching `x-api-key` header (timing-safe comparison).
+//   - Rate-limit per IP (CWE-770), reusing the /api/lead bucket.
+//   - CWE-532: never log the raw cédula or bureau payload.
 //
-// Legal: el caller (bot u otro servicio) es responsable de tener consentimiento
-// del usuario antes de llamar este endpoint (Ley 9859 art. 44 bis). El endpoint
-// no requiere un campo `consentimiento` en el body porque eso sería teatro de
-// seguridad: un cliente malicioso lo pasaría igual.
+// Legal: the caller (bot or other service) is responsible for obtaining user
+// consent before calling this endpoint (Ley 9859 art. 44 bis). The endpoint does
+// not require a `consent` field in the body because that would be security
+// theater: a malicious client would just pass it anyway.
 
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -24,10 +25,10 @@ import { isRateLimited } from "@/lib/leads/rate-limit";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  // Mínimo laxo (string ≥ 3 chars): el mock hashea cualquier string.
-  // Validación estricta de formato CR (X-XXXX-XXXXX) se puede agregar luego
-  // sin romper la API, cuando se confirme el formato exacto aceptado por Equifax.
-  idNumber: z.string().trim().min(3, "idNumber requerido (min 3 chars)"),
+  // Lax minimum (string ≥ 3 chars): the mock hashes any string.
+  // Strict CR-format validation (X-XXXX-XXXXX) can be added later without breaking
+  // the API, once the exact format accepted by Equifax is confirmed.
+  idNumber: z.string().trim().min(3, "idNumber required (min 3 chars)"),
 });
 
 function clientIp(req: Request): string {
@@ -45,23 +46,23 @@ function json(body: unknown, status: number): Response {
 
 function checkApiAuth(req: Request): boolean {
   const expected = getEnv().PRECALI_BURO_API_KEY;
-  // Sin env var → modo desarrollo, endpoint público.
+  // No env var → development mode, public endpoint.
   if (!expected) return true;
   const provided = req.headers.get("x-api-key") ?? "";
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
-  // timingSafeEqual exige igual longitud; distinta longitud ya es inválido.
+  // timingSafeEqual requires equal length; different length is already invalid.
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // CWE-306: auth opcional cuando PRECALI_BURO_API_KEY está seteada.
+  // CWE-306: optional auth when PRECALI_BURO_API_KEY is set.
   if (!checkApiAuth(req)) {
     return json({ ok: false, error: "unauthorized" }, 401);
   }
 
-  // CWE-770: rate-limit por IP, mismo bucket que /api/lead.
+  // CWE-770: rate-limit per IP, same bucket as /api/lead.
   if (isRateLimited(clientIp(req))) {
     return json({ ok: false, error: "rate_limited" }, 429);
   }
@@ -81,17 +82,17 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // El mock es determinista: misma cédula → mismo resultado byte a byte.
-  // fechaConsulta va como metadata aparte, no afecta el seed del PRNG.
+  // The mock is deterministic: same cédula → same result byte for byte.
+  // inquiryDate is metadata only; it does not affect the PRNG seed.
   const buro = generateMockBuroResponse(
     parsed.data.idNumber,
     new Date().toISOString(),
   );
 
-  // CWE-532: nunca loguear la cédula ni el payload crudo.
+  // CWE-532: never log the cédula or the raw payload.
   console.info("[buro]", {
     ts: new Date().toISOString(),
-    categoria: buro.categoriaSugef,
+    category: buro.sugefCategory,
     score: buro.score,
   });
 

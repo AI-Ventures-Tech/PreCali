@@ -2,7 +2,7 @@
 // Port fiel de api/_lib/precali-memory.js (Session/Profile/Lead) y precali-flow.js (Action).
 
 import type { PaisId } from "@/types/precali";
-import type { EngineResult } from "@/types/buro";
+import type { RiskLevel } from "@/types/buro";
 
 export const SESSION_VERSION = 2 as const;
 
@@ -51,7 +51,10 @@ export interface Session {
   lastResults: unknown | null;
   targetBank: string | null;
   lead: Lead;
-  buroResult: EngineResult | null;
+  // INV-4 (CWE-359): only the level is persisted — score, sugefCategory, ratio and
+  // other EngineResult fields are computed in stepLeadDatos and discarded before
+  // saveSession. The bot only needs `level` in subsequent turns.
+  buroLevel: RiskLevel | null;
   documentText: string;
   extractedSummary: string;
   correctionNote: string;
