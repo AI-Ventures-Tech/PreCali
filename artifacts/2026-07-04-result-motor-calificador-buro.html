@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resultado · Motor calificador con mock de buró (PreCali)</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --surface:#ffffff; --surface-2:#efede6; --border:#e3e0d6; --track:#e7e4da;
+    --ink:#1b1b19; --ink-soft:#56534b; --ink-faint:#8b877a;
+    --accent:#2f6f6a; --accent-soft:#e2efed; --accent-line:#bcdcd8;
+    --done:#2e7d52; --done-bg:#e6f2ea;
+    --risk:#9a6400; --risk-bg:#fbf0db;
+    --error:#b3261e; --error-bg:#f8e4e2;
+    --info:#2b5aa8; --info-bg:#e7eefa;
+    --decision:#6b4ea3; --decision-bg:#efe9f8;
+    --shadow:0 1px 0 rgba(0,0,0,.02); --shadow-pop:0 12px 34px rgba(40,38,30,.17),0 2px 8px rgba(0,0,0,.05);
+    --radius:12px; --maxw:1180px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16161a; --surface:#1e1f25; --surface-2:#26272e; --border:#34353d; --track:#2c2d35;
+      --ink:#ecebe6; --ink-soft:#b3b1a9; --ink-faint:#86847d;
+      --accent:#6fd0c6; --accent-soft:#1f322f; --accent-line:#2c4d49;
+      --done:#62c98c; --done-bg:#16291f; --risk:#e0ad55; --risk-bg:#2c2415;
+      --error:#ef6b62; --error-bg:#2e1916; --info:#7aa6e8; --info-bg:#161f2e;
+      --decision:#b69ce6; --decision-bg:#221b30;
+      --shadow:0 1px 0 rgba(0,0,0,.25); --shadow-pop:0 14px 40px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.4);
+    }
+    .codeblock pre{background:#101116 !important; border:1px solid #2c2d35}
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth; font-size:106.25%}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:"Avenir Next","Avenir","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:1rem; line-height:1.62; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+  a{color:var(--accent); text-decoration:none} a:hover{text-decoration:underline}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.86em; background:var(--surface-2); padding:.1em .4em; border-radius:5px; word-break:break-word}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(16px,4vw,40px)}
+
+  header.hero{padding:clamp(26px,5vw,50px) 0 24px; border-bottom:1px solid var(--border)}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:.74rem; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:750}
+  .eyebrow::before{content:''; width:22px; height:2px; background:var(--accent); display:inline-block}
+  h1{font-size:clamp(1.8rem,4.8vw,2.9rem); line-height:1.1; margin:.3em 0 .12em; letter-spacing:-.012em; font-weight:720}
+  .tldr{font-size:clamp(1.05rem,2.4vw,1.34rem); line-height:1.4; color:var(--ink-soft); max-width:64ch; font-weight:430} .tldr b{color:var(--ink); font-weight:680}
+  .steps{display:flex; align-items:center; gap:0; margin:24px 0 4px; max-width:520px; flex-wrap:wrap}
+  .step{display:flex; align-items:center; gap:8px; font-size:.78rem; font-weight:650; color:var(--ink-faint)}
+  .step .dot{width:13px; height:13px; border-radius:50%; border:2px solid var(--track); background:var(--surface); flex:none}
+  .step.on{color:var(--accent)} .step.on .dot{background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
+  .step .bar{flex:1; height:2px; background:var(--track); margin:0 10px; min-width:26px} .step.on .bar{background:var(--accent)}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:10px; margin-top:26px}
+  .stat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .stat::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.5}
+  .stat.s-risk::before{background:var(--risk)} .stat.s-done::before{background:var(--done)} .stat.s-error::before{background:var(--error)}
+  .stat .n{display:block; font-size:1.9rem; line-height:1; font-weight:790; letter-spacing:-.03em; color:var(--ink)}
+  .stat .l{display:block; font-size:.74rem; color:var(--ink-faint); margin-top:5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+  .stat .h{display:inline-flex; align-items:center; gap:5px; font-size:1.02rem; font-weight:720; color:var(--done)}
+  .stat .v{display:block; font-size:1.4rem; line-height:1.06; font-weight:760; letter-spacing:-.01em; color:var(--ink)}
+  .stat .v.sm{font-size:1.04rem; font-weight:700; line-height:1.2}
+  .stat.s-done .v{color:var(--done)}
+
+  .badge{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; font-weight:650; padding:4px 10px 4px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap}
+  .b-done{color:var(--done); background:var(--done-bg); border-color:color-mix(in srgb,var(--done) 30%,transparent)}
+  .b-risk{color:var(--risk); background:var(--risk-bg); border-color:color-mix(in srgb,var(--risk) 30%,transparent)}
+  .b-error{color:var(--error); background:var(--error-bg); border-color:color-mix(in srgb,var(--error) 30%,transparent)}
+  .b-info{color:var(--info); background:var(--info-bg); border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+  .b-add{color:var(--done); background:var(--done-bg); border-color:color-mix(in srgb,var(--done) 30%,transparent)}
+  .b-mod{color:var(--info); background:var(--info-bg); border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+
+  .grid{display:grid; grid-template-columns:218px minmax(0,1fr); gap:clamp(22px,4vw,48px); padding:28px 0 90px; align-items:start}
+  nav.toc{position:sticky; top:18px; max-height:calc(100vh - 36px); overflow:auto; font-size:.86rem; padding-right:4px}
+  nav.toc .toc-h{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; margin:0 0 8px 12px}
+  nav.toc ol{list-style:none; margin:0; padding:0; border-left:2px solid var(--border)}
+  nav.toc li a{display:block; padding:5px 12px; color:var(--ink-soft); border-left:2px solid transparent; margin-left:-2px; line-height:1.3}
+  nav.toc li a:hover{color:var(--ink)}
+  nav.toc li a.here{color:var(--accent); border-left-color:var(--accent); font-weight:650; background:linear-gradient(90deg,var(--accent-soft),transparent)}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px}
+  .ctrl{font:inherit; font-size:.82rem; font-weight:600; color:var(--ink-soft); background:var(--surface); border:1px solid var(--border); padding:7px 13px; border-radius:8px; cursor:pointer}
+  .ctrl:hover{border-color:var(--accent); color:var(--accent)}
+
+  .timeline{position:relative}
+  .timeline::before{content:''; position:absolute; left:13px; top:12px; bottom:12px; width:2px; background:var(--border); z-index:0}
+  .node{position:relative; padding-left:44px; margin:0 0 16px}
+  .node-dot{position:absolute; left:3px; top:15px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.72rem; z-index:1; border:3px solid var(--bg); background:var(--surface)}
+  .d-info{color:var(--info); box-shadow:inset 0 0 0 2px var(--info)}
+  .d-build{color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent)}
+  .d-risk{color:var(--risk); box-shadow:inset 0 0 0 2px var(--risk)}
+  .d-done{color:var(--done); box-shadow:inset 0 0 0 2px var(--done)}
+
+  section.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); scroll-margin-top:16px; box-shadow:var(--shadow)}
+  details{margin:0}
+  summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:13px; padding:15px 19px; user-select:none}
+  summary::-webkit-details-marker{display:none}
+  .chev{width:14px; height:14px; flex:none; color:var(--ink-faint); transition:transform .18s ease}
+  details[open] .chev{transform:rotate(90deg)}
+  .s-num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.05rem; font-weight:720; color:var(--ink-faint); flex:none; letter-spacing:-.02em; min-width:1.6em}
+  .s-title{font-size:1.08rem; font-weight:690; flex:1; min-width:0; letter-spacing:-.01em}
+  .s-tag{font-size:.74rem; color:var(--ink-faint); font-weight:600}
+  .body{padding:2px 19px 19px 19px; border-top:1px solid var(--border)}
+  .body > :first-child{margin-top:14px}
+  .body p{margin:.55em 0; color:var(--ink-soft)} .body strong{color:var(--ink)}
+  .body ul{margin:.4em 0; padding-left:1.25em} .body li{margin:.3em 0; color:var(--ink-soft)}
+  h3{font-size:.95rem; margin:1.3em 0 .3em; color:var(--ink); font-weight:690; letter-spacing:-.01em} h3:first-child{margin-top:.2em}
+
+  .callout{display:flex; gap:11px; align-items:flex-start; padding:12px 14px; border-radius:9px; margin:12px 0; font-size:.93rem; line-height:1.5}
+  .callout .gi{flex:none; margin-top:1px}
+  .c-info{background:var(--info-bg); color:var(--info)} .c-info b,.c-info strong{color:var(--info)}
+  .c-risk{background:var(--risk-bg); color:var(--risk)} .c-risk b,.c-risk strong{color:var(--risk)}
+  .c-done{background:var(--done-bg); color:var(--done)} .c-done b,.c-done strong{color:var(--done)}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:.9rem}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+  th{font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.84rem; white-space:nowrap}
+  .add{color:var(--done)} .del{color:var(--error)}
+
+  .codeblock{position:relative; margin:12px 0}
+  .codeblock pre{margin:0; background:#1f211d; color:#e7e6df; border-radius:9px; padding:14px 16px; overflow-x:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; line-height:1.55}
+  .cmd-state{display:inline-block; font-size:.72rem; font-weight:700; margin:0 0 6px; padding:2px 8px; border-radius:6px}
+  .cmd-ok{color:var(--done); background:var(--done-bg)}
+  .copybtn{position:absolute; top:9px; right:9px; font:inherit; font-size:.72rem; font-weight:650; color:#cfcec6; background:#34362f; border:1px solid #4a4c43; padding:4px 9px; border-radius:6px; cursor:pointer}
+  .copybtn:hover{background:#42443b; color:#fff} .copybtn.ok{color:#9fe0b6; border-color:#3e6b4f}
+
+  .ns-bar{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin:12px 0 14px}
+  .copyans{font:inherit; font-size:.82rem; font-weight:650; color:#fff; background:var(--accent); border:none; padding:8px 14px; border-radius:8px; cursor:pointer}
+  .copyans:hover{filter:brightness(1.06)} .copyans.ok{background:var(--done)}
+  .ns{list-style:none; margin:8px 0 0; padding:0}
+  .ns li{display:flex; gap:11px; align-items:flex-start; padding:9px 0; border-bottom:1px dashed var(--border)}
+  .ns li:last-child{border-bottom:none}
+  .ns input{margin-top:3px; flex:none; width:17px; height:17px; accent-color:var(--accent); cursor:pointer}
+  .ns .tx{flex:1; min-width:0; color:var(--ink)} .ns .tx small{display:block; color:var(--ink-faint); font-size:.82rem; margin-top:2px}
+  .ns li.done .tx{color:var(--ink-faint); text-decoration:line-through}
+
+  .na{position:fixed; right:18px; bottom:18px; width:min(330px,calc(100vw - 36px)); background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-pop); z-index:50; overflow:hidden}
+  .na-head{display:flex; align-items:center; gap:9px; padding:11px 13px; background:var(--surface-2); border-bottom:1px solid var(--border)}
+  .na-head .t{font-weight:700; font-size:.86rem; flex:1}
+  .na-head .ct{font-size:.72rem; font-weight:700; color:#fff; background:var(--error); border-radius:999px; padding:1px 8px}
+  .na-head .ct.clear{background:var(--done)}
+  .na-x{border:none; background:none; cursor:pointer; color:var(--ink-faint); font-size:1.05rem; line-height:1; padding:2px 4px} .na-x:hover{color:var(--ink)}
+  .na-list{list-style:none; margin:0; padding:6px; max-height:46vh; overflow:auto}
+  .na-empty{padding:18px 14px; text-align:center; color:var(--ink-soft); font-size:.88rem}
+  .na-reopen{position:fixed; right:18px; bottom:18px; z-index:50; display:none; align-items:stretch; border-radius:999px; overflow:hidden; box-shadow:var(--shadow-pop)}
+  .na-reopen.show{display:inline-flex}
+  .na-reopen button{font:inherit; font-size:.8rem; font-weight:650; color:var(--bg); background:var(--ink); border:none; cursor:pointer}
+  .na-reopen .nr-main{padding:9px 13px; display:inline-flex; align-items:center; gap:7px}
+  .na-reopen .nr-x{padding:9px 12px; border-left:1px solid rgba(255,255,255,.22); font-weight:800}
+  .na-reopen button:hover{filter:brightness(1.35)}
+
+  .reveal{opacity:0; transform:translateY(10px)} .reveal.in{opacity:1; transform:none; transition:opacity .24s ease, transform .24s ease}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1 !important; transform:none !important; transition:none !important} .chev{transition:none}
+  }
+  footer{border-top:1px solid var(--border); padding:22px 0 40px; color:var(--ink-faint); font-size:.82rem}
+  @media (max-width:820px){
+    .grid{grid-template-columns:1fr; gap:8px}
+    nav.toc{position:static; max-height:none; margin-bottom:6px; border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface)}
+    nav.toc ol{border-left:none; columns:2; column-gap:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="reveal">
+      <div class="eyebrow">ResultViewer · post-ejecución</div>
+      <h1>El bot ya sabe distinguir un buen perfil de crédito de uno riesgoso</h1>
+      <p class="tldr">Se construyó un "clasificador de riesgo" simulado (todavía no hay acceso real a Equifax) que separa a cada persona en <b>3 niveles</b> y cambia cómo le habla el bot y qué le ofrece. Se revisó dos veces y se probó con conversaciones reales simuladas. <b>Todo en verde</b>, falta solo la decisión de subirlo.</p>
+      <p class="readline" style="margin:10px 0 0;font-size:.82rem;color:var(--ink-faint);font-weight:600">~<span id="readmins">?</span> min de lectura</p>
+    </div>
+    <div class="steps reveal" aria-label="Estado del resultado">
+      <span class="step on"><span class="dot"></span>construido</span><span class="bar"></span>
+      <span class="step on"><span class="dot"></span>revisado y probado</span><span class="bar"></span>
+      <span class="step"><span class="dot"></span>subido (commit)</span>
+    </div>
+    <div class="stats reveal">
+      <div class="stat"><span class="n" data-to="11">0</span><span class="l">archivos tocados</span></div>
+      <div class="stat"><span class="v">36 → 63</span><span class="l">pruebas automáticas</span></div>
+      <div class="stat s-done"><span class="n" data-to="0">0</span><span class="l">errores actuales</span></div>
+      <div class="stat s-done"><span class="v">SHIP</span><span class="l">revisión de código</span></div>
+      <div class="stat s-done"><span class="v">3/3 ok</span><span class="l">prueba de uso real</span></div>
+      <div class="stat s-done"><span class="h"><span aria-hidden="true">✓</span> Listo</span><span class="l">para revisar y subir</span></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <nav class="toc" aria-label="Secciones"><p class="toc-h">En esta página</p><ol id="tocList"></ol></nav>
+
+    <main id="content">
+      <div class="controls reveal">
+        <button class="ctrl" id="expandAll">▾ Expandir todo</button>
+        <button class="ctrl" id="collapseAll">▸ Colapsar todo</button>
+      </div>
+
+      <div class="timeline">
+        <!-- 01 SUMMARY -->
+        <div class="node reveal">
+          <span class="node-dot d-info" aria-hidden="true">●</span>
+          <section class="card" id="summary" data-title="Resumen" data-accent="info">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">01</span><span class="s-title">Resumen</span><span class="s-tag">empieza acá</span></summary>
+              <div class="body">
+                <p>Hoy, cuando alguien escribe al bot de WhatsApp, se le muestran los mismos bancos sin importar si tiene buen historial crediticio o no. Se construyó la pieza que faltaba para cambiar eso: en el momento en que la persona da su cédula, el sistema simula una consulta al buró de crédito (todavía no hay acceso real a Equifax, así que se inventa un resultado creíble basado en las categorías reales que usa el regulador de Costa Rica) y con eso decide un <b>Nivel 1, 2 o 3</b> de riesgo.</p>
+                <ul>
+                  <li><strong>Nivel 1 (riesgo alto):</strong> el bot deja de intentar venderle un banco y en cambio lo guía para mejorar su historial en 6 meses.</li>
+                  <li><strong>Nivel 2 (riesgo medio):</strong> el bot le avisa que probablemente necesite una prima o enganche más alto.</li>
+                  <li><strong>Nivel 3 (cliente prime):</strong> el bot va directo a cerrar con las mejores tasas.</li>
+                </ul>
+                <div class="callout c-done"><span class="gi" aria-hidden="true">✓</span><div><strong>Resultado.</strong> Todo compila sin errores, las 63 pruebas automáticas pasan, un revisor independiente (otro modelo de IA, sin ver el trabajo previo) lo aprobó, y se probó simulando conversaciones reales de WhatsApp para los 3 niveles. Nada se subió todavía al repositorio: falta tu decisión de hacerlo.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 02 FILES CHANGED -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">▣</span>
+          <section class="card" id="files" data-title="Qué se tocó" data-accent="accent">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">02</span><span class="s-title">Qué se tocó</span><span class="s-tag">11 archivos · +757 −24 líneas</span></summary>
+              <div class="body">
+                <h3>Piezas nuevas (el clasificador en sí)</h3>
+                <table>
+                  <thead><tr><th>Archivo</th><th>Qué hace, en simple</th><th>Tipo</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>src/types/buro.ts</code></td><td>Define qué forma tiene un "resultado de buró" y un "nivel de riesgo".</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/mock-equifax.ts</code></td><td>Inventa el resultado del buró de crédito para una cédula, siempre igual para la misma cédula.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/engine.ts</code></td><td>Toma ese resultado y decide el Nivel 1/2/3 según las reglas del negocio.</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                    <tr><td><code>src/lib/buro/__tests__/*.test.ts</code></td><td>Pruebas automáticas de las dos piezas de arriba (13 pruebas).</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                  </tbody>
+                </table>
+                <h3>Conectado al bot que ya existía</h3>
+                <table>
+                  <thead><tr><th>Archivo</th><th>Qué cambió, en simple</th><th>Tipo</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>src/lib/whatsapp/flow.ts</code></td><td>Al recibir la cédula, ahora calcula el nivel; y si es Nivel 1 no ofrece "aplicar al banco", muestra el mensaje de recuperación.</td><td><span class="badge b-mod">◐ modificado</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/agent.ts</code></td><td>La IA que responde dudas del usuario ahora ajusta su tono según el nivel.</td><td><span class="badge b-mod">◐ modificado</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/types.ts</code> / <code>memory.ts</code></td><td>Se le agregó un campo a la conversación guardada para recordar el nivel del usuario.</td><td><span class="badge b-mod">◐ modificado</span></td></tr>
+                    <tr><td><code>src/lib/whatsapp/__tests__/*.test.ts</code></td><td>Pruebas nuevas de esta conexión (13 pruebas).</td><td><span class="badge b-add">+ nuevo</span></td></tr>
+                  </tbody>
+                </table>
+                <p style="font-size:.85rem; color:var(--ink-faint)">Un archivo (<code>ai.ts</code>) se tocó y se revirtió durante el proceso: se descubrió que ese camino de código no lo usa el bot en la práctica, así que se movió la conexión al lugar correcto (<code>agent.ts</code>) y ese archivo quedó exactamente como estaba.</p>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 03 COMMANDS RUN -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">$</span>
+          <section class="card" id="commands" data-title="Verificaciones corridas" data-accent="accent">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">03</span><span class="s-title">Verificaciones corridas</span><span class="s-tag">todas OK</span></summary>
+              <div class="body">
+                <p>Antes de tocar código se guardó el estado de partida (baseline): 36 pruebas pasando, 0 errores de tipos, 0 avisos de lint. Al terminar:</p>
+                <span class="cmd-state cmd-ok">✓ 0 errores de tipos</span>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>npx tsc --noEmit</pre></div>
+                <span class="cmd-state cmd-ok">✓ 10 archivos de prueba, 63 pruebas, 0 fallidas (antes: 36)</span>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>npm test -- --run</pre></div>
+                <span class="cmd-state cmd-ok">✓ sin avisos</span>
+                <div class="codeblock"><button class="copybtn">Copiar</button>
+<pre>npm run lint</pre></div>
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Doble revisión.</strong> Un revisor de código independiente (Codex, sin contexto previo del trabajo) encontró 3 cosas para corregir en la primera pasada: pruebas que faltaban, un mensaje que se perdía al re-mostrarse en una situación puntual, y un pedazo de código que quedó sin usar. Se corrigieron las tres y la segunda revisión dio <b>SHIP</b> (listo para enviar) sin objeciones.</div></div>
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Prueba de uso real.</strong> Se simuló la conversación completa de WhatsApp (elegir producto, dar ingresos, elegir banco, dar cédula, subir documentos, confirmar) para una cédula de cada nivel, y se leyó el mensaje exacto que vería la persona en cada caso. Los 3 casos se comportaron como se esperaba.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 04 ERRORS / WARNINGS -->
+        <div class="node reveal">
+          <span class="node-dot d-risk" aria-hidden="true">▲</span>
+          <section class="card" id="errors" data-title="Problemas pendientes" data-accent="risk">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">04</span><span class="s-title">Problemas pendientes</span><span class="s-tag">0</span></summary>
+              <div class="body">
+                <div class="callout c-done"><span class="gi" aria-hidden="true">✓</span><div><strong>Sin errores ni avisos pendientes.</strong> Todo lo que encontró la revisión ya se corrigió (ver sección anterior). Lo único abierto son dos preguntas de negocio, no bloqueantes, que quedaron anotadas en el plan original: (1) si el texto de autorización para consultar el buró alcanza con una línea o necesita un paso de confirmación aparte, y (2) si la escala de puntaje 300-850 que se usó como referencia es aceptable hasta tener acceso real a Equifax.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 05 NEXT STEPS -->
+        <div class="node reveal">
+          <span class="node-dot d-done" aria-hidden="true">→</span>
+          <section class="card" id="next" data-title="Próximos pasos" data-accent="done">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">05</span><span class="s-title">Próximos pasos</span><span class="s-tag" id="nsTag">pendientes</span></summary>
+              <div class="body">
+                <div class="ns-bar">
+                  <button class="copyans" id="copyNext">Copiar próximos pasos</button>
+                  <span class="q-summary" id="nsSummary" style="font-size:.85rem;color:var(--ink-soft)"></span>
+                </div>
+                <ul class="ns">
+                  <li data-id="review"><input type="checkbox"><span class="tx">Revisar el resultado (podés pedirme el diff completo si querés verlo línea por línea)</span></li>
+                  <li data-id="commit"><input type="checkbox"><span class="tx">Decidir si lo subo con <code>/git-save</code><small>nada está commiteado todavía</small></span></li>
+                  <li data-id="consent"><input type="checkbox"><span class="tx">Confirmar si el texto de autorización de cédula alcanza con una línea o necesita un paso aparte<small>pregunta no bloqueante del plan original</small></span></li>
+                  <li data-id="score-scale"><input type="checkbox"><span class="tx">Confirmar si la escala de puntaje 300-850 sirve como referencia temporal<small>se recalibra cuando haya acceso real a Equifax</small></span></li>
+                  <li data-id="real-equifax"><input type="checkbox"><span class="tx">Cuando el equipo tenga cuenta real en Equifax, planificar el reemplazo del simulador por la consulta real<small>trabajo futuro, no incluido en este cambio</small></span></li>
+                </ul>
+              </div>
+            </details>
+          </section>
+        </div>
+      </div>
+
+      <footer>Generado a partir del resultado del /craft · no editar a mano · regenerable on demand · ResultViewer</footer>
+    </main>
+  </div>
+</div>
+
+<aside class="na" id="na" aria-label="Needs attention">
+  <div class="na-head"><span aria-hidden="true" style="color:var(--done)">✓</span><span class="t">Needs attention</span>
+    <span class="ct clear" id="naCount">0</span><button class="na-x" id="naClose" aria-label="Cerrar panel">×</button></div>
+  <ul class="na-list" id="naList"></ul>
+  <p class="na-empty">Todo en orden — nada bloqueante.</p>
+</aside>
+<div class="na-reopen" id="naReopen"><button class="nr-main" id="naReopenMain"><span aria-hidden="true">✓</span> Needs attention (<span id="naReopenN">0</span>)</button><button class="nr-x" id="naReopenX" aria-label="Ocultar del todo">×</button></div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var mins=1;
+  try{ var txt=(document.getElementById('content').innerText||'').trim();
+    var words=txt?txt.split(/\s+/).length:0; mins=Math.max(1,Math.ceil(words/238)); }catch(e){}
+  var rl=document.getElementById('readmins'); if(rl) rl.textContent=mins;
+
+  function countUp(el,to,prefix,suffix){
+    if(reduce){ el.textContent=(prefix||'')+to+(suffix||''); return; }
+    var start=null;
+    function tick(ts){ if(!start)start=ts; var p=Math.min(1,(ts-start)/900);
+      el.textContent=(prefix||'')+Math.round((1-Math.pow(1-p,3))*to)+(suffix||''); if(p<1)requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  }
+  document.querySelectorAll('.stat .n').forEach(function(el){
+    countUp(el,parseInt(el.getAttribute('data-to')||'0',10),el.getAttribute('data-prefix')||'',el.getAttribute('data-suffix')||'');
+  });
+
+  var secs=[].slice.call(document.querySelectorAll('section.card[data-title]'));
+  var tocList=document.getElementById('tocList'), links={};
+  secs.forEach(function(s){ var li=document.createElement('li'), a=document.createElement('a');
+    a.href='#'+s.id; a.textContent=s.getAttribute('data-title'); li.appendChild(a); tocList.appendChild(li); links[s.id]=a; });
+  var spy=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){
+    Object.keys(links).forEach(function(k){links[k].classList.remove('here');});
+    if(links[en.target.id])links[en.target.id].classList.add('here'); } }); }, {rootMargin:'-12% 0px -70% 0px',threshold:0});
+  secs.forEach(function(s){ spy.observe(s); });
+
+  var reveals=[].slice.call(document.querySelectorAll('.reveal'));
+  if(reduce){ reveals.forEach(function(el){ el.classList.add('in'); }); }
+  else{ var io=new IntersectionObserver(function(es,obs){ es.forEach(function(en){
+    if(en.isIntersecting){ en.target.classList.add('in'); obs.unobserve(en.target); } }); },
+    {rootMargin:'0px 0px -8% 0px',threshold:.06}); reveals.forEach(function(el){ io.observe(el); }); }
+
+  function setAll(o){ document.querySelectorAll('section.card details').forEach(function(d){ d.open=o; }); }
+  document.getElementById('expandAll').addEventListener('click',function(){ setAll(true); });
+  document.getElementById('collapseAll').addEventListener('click',function(){ setAll(false); });
+
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click',function(){ var pre=btn.parentElement.querySelector('pre'); var t=pre?pre.innerText:'';
+      function ok(){ var o=btn.textContent; btn.textContent='Copiado ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent=o; btn.classList.remove('ok'); },1400); }
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(ok).catch(function(){fb(t,ok);}); } else fb(t,ok); }); });
+  function fb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+
+  var na=document.getElementById('na'), reopen=document.getElementById('naReopen');
+  document.getElementById('naClose').addEventListener('click',function(){ na.style.display='none'; reopen.classList.add('show'); });
+  document.getElementById('naReopenMain').addEventListener('click',function(){ na.style.display=''; reopen.classList.remove('show'); });
+  document.getElementById('naReopenX').addEventListener('click',function(){ reopen.classList.remove('show'); });
+})();
+
+(function(){
+  "use strict";
+  var items=[].slice.call(document.querySelectorAll('.ns li'));
+  if(!items.length) return;
+  var STORE='haq-next-'+((location.pathname.split('/').pop())||'result');
+  var mem={};
+  function load(){ try{ return JSON.parse(localStorage.getItem(STORE))||{}; }catch(e){ return mem; } }
+  function save(d){ try{ localStorage.setItem(STORE,JSON.stringify(d)); }catch(e){ mem=d; } }
+  var state=load();
+  var nsSummary=document.getElementById('nsSummary'), nsTag=document.getElementById('nsTag');
+
+  function refresh(){
+    var done=0;
+    items.forEach(function(li){ var c=li.querySelector('input').checked; li.classList.toggle('done',c); if(c) done++; });
+    var pend=items.length-done;
+    if(nsSummary) nsSummary.innerHTML='<b>'+done+'/'+items.length+'</b> hechos · <b>'+pend+'</b> pendientes';
+    if(nsTag) nsTag.textContent=pend+' pendientes';
+  }
+  items.forEach(function(li){
+    var id=li.getAttribute('data-id'), cb=li.querySelector('input');
+    if(state[id]) cb.checked=true;
+    cb.addEventListener('change',function(){ var d=load(); d[id]=cb.checked; save(d); refresh(); });
+  });
+  var copyBtn=document.getElementById('copyNext');
+  if(copyBtn) copyBtn.addEventListener('click',function(){
+    var pend=[];
+    items.forEach(function(li){ if(!li.querySelector('input').checked){
+      var tx=li.querySelector('.tx').cloneNode(true);
+      var sm=tx.querySelector('small'); if(sm) sm.parentNode.removeChild(sm);
+      pend.push('- '+tx.textContent.replace(/\s+/g,' ').trim()); }});
+    var text=pend.length
+      ? 'Seguí con estos próximos pasos pendientes:\n'+pend.join('\n')
+      : 'Todos los próximos pasos quedaron hechos; no hay pendientes.';
+    function ok(){ copyBtn.textContent='Copiado ✓'; copyBtn.classList.add('ok');
+      setTimeout(function(){ copyBtn.textContent='Copiar próximos pasos'; copyBtn.classList.remove('ok'); },1500); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(function(){ nfb(text,ok); }); } else nfb(text,ok);
+  });
+  function nfb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+  refresh();
+})();
+</script>
+</body>
+</html>

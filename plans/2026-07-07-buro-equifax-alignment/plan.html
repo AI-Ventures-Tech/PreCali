@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan · PreCali / Alineación del mock de buró con Equifax LATAM</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --surface:#ffffff; --surface-2:#efede6; --border:#e3e0d6; --track:#e7e4da;
+    --ink:#1b1b19; --ink-soft:#56534b; --ink-faint:#8b877a;
+    --accent:#2f6f6a; --accent-soft:#e2efed; --accent-line:#bcdcd8;
+    --done:#2e7d52; --done-bg:#e6f2ea;
+    --risk:#9a6400; --risk-bg:#fbf0db;
+    --error:#b3261e; --error-bg:#f8e4e2;
+    --info:#2b5aa8; --info-bg:#e7eefa;
+    --decision:#6b4ea3; --decision-bg:#efe9f8;
+    --shadow:0 1px 0 rgba(0,0,0,.02); --shadow-pop:0 12px 34px rgba(40,38,30,.17),0 2px 8px rgba(0,0,0,.05);
+    --radius:12px; --maxw:1180px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16161a; --surface:#1e1f25; --surface-2:#26272e; --border:#34353d; --track:#2c2d35;
+      --ink:#ecebe6; --ink-soft:#b3b1a9; --ink-faint:#86847d;
+      --accent:#6fd0c6; --accent-soft:#1f322f; --accent-line:#2c4d49;
+      --done:#62c98c; --done-bg:#16291f; --risk:#e0ad55; --risk-bg:#2c2415;
+      --error:#ef6b62; --error-bg:#2e1916; --info:#7aa6e8; --info-bg:#161f2e;
+      --decision:#b69ce6; --decision-bg:#221b30;
+      --shadow:0 1px 0 rgba(0,0,0,.25); --shadow-pop:0 14px 40px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.4);
+    }
+    .codeblock pre{background:#101116 !important; border:1px solid #2c2d35}
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth; font-size:106.25%}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:"Avenir Next","Avenir","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:1rem; line-height:1.62; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+  a{color:var(--accent); text-decoration:none} a:hover{text-decoration:underline}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.86em; background:var(--surface-2);
+    padding:.1em .4em; border-radius:5px; word-break:break-word}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(16px,4vw,40px)}
+
+  header.hero{padding:clamp(26px,5vw,50px) 0 24px; border-bottom:1px solid var(--border)}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:.74rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--accent); font-weight:750}
+  .eyebrow::before{content:''; width:22px; height:2px; background:var(--accent); display:inline-block}
+  h1{font-size:clamp(1.8rem,4.8vw,2.9rem); line-height:1.1; margin:.3em 0 .12em;
+    letter-spacing:-.012em; font-weight:720}
+  .tldr{font-size:clamp(1.05rem,2.4vw,1.34rem); line-height:1.4; color:var(--ink-soft);
+    max-width:64ch; font-weight:430} .tldr b{color:var(--ink); font-weight:680}
+  .steps{display:flex; align-items:center; gap:0; margin:24px 0 4px; max-width:520px; flex-wrap:wrap}
+  .step{display:flex; align-items:center; gap:8px; font-size:.78rem; font-weight:650; color:var(--ink-faint)}
+  .step .dot{width:13px; height:13px; border-radius:50%; border:2px solid var(--track); background:var(--surface); flex:none}
+  .step.on{color:var(--accent)} .step.on .dot{background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
+  .step .bar{flex:1; height:2px; background:var(--track); margin:0 10px; min-width:26px} .step.on .bar{background:var(--accent)}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:10px; margin-top:26px}
+  .stat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .stat::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.5}
+  .stat.s-risk::before{background:var(--risk)} .stat.s-done::before{background:var(--done)}
+  .stat .n{display:block; font-size:1.9rem; line-height:1; font-weight:790; letter-spacing:-.03em; color:var(--ink)}
+  .stat .l{display:block; font-size:.74rem; color:var(--ink-faint); margin-top:5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+  .stat .h{display:inline-flex; align-items:center; gap:5px; font-size:1.02rem; font-weight:720; color:var(--done)}
+  .stat .v{display:block; font-size:1.4rem; line-height:1.06; font-weight:760; letter-spacing:-.01em; color:var(--ink)}
+  .stat .v.sm{font-size:1.04rem; font-weight:700; line-height:1.2}
+  .stat.s-done .v{color:var(--done)} .stat.s-risk .v{color:var(--risk)} .stat.s-error .v{color:var(--error)}
+  .readline{margin:10px 0 0; font-size:.82rem; color:var(--ink-faint); font-weight:600}
+
+  .badge{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; font-weight:650;
+    padding:4px 10px 4px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap}
+  .b-done{color:var(--done); background:var(--done-bg); border-color:color-mix(in srgb,var(--done) 30%,transparent)}
+  .b-risk{color:var(--risk); background:var(--risk-bg); border-color:color-mix(in srgb,var(--risk) 30%,transparent)}
+  .b-info{color:var(--info); background:var(--info-bg); border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+  .b-decision{color:var(--decision); background:var(--decision-bg); border-color:color-mix(in srgb,var(--decision) 30%,transparent)}
+
+  .grid{display:grid; grid-template-columns:218px minmax(0,1fr); gap:clamp(22px,4vw,48px); padding:28px 0 90px; align-items:start}
+  nav.toc{position:sticky; top:18px; max-height:calc(100vh - 36px); overflow:auto; font-size:.86rem; padding-right:4px}
+  nav.toc .toc-h{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; margin:0 0 8px 12px}
+  nav.toc ol{list-style:none; margin:0; padding:0; border-left:2px solid var(--border)}
+  nav.toc li a{display:block; padding:5px 12px; color:var(--ink-soft); border-left:2px solid transparent; margin-left:-2px; line-height:1.3}
+  nav.toc li a:hover{color:var(--ink)}
+  nav.toc li a.here{color:var(--accent); border-left-color:var(--accent); font-weight:650; background:linear-gradient(90deg,var(--accent-soft),transparent)}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px}
+  .ctrl{font:inherit; font-size:.82rem; font-weight:600; color:var(--ink-soft); background:var(--surface); border:1px solid var(--border); padding:7px 13px; border-radius:8px; cursor:pointer}
+  .ctrl:hover{border-color:var(--accent); color:var(--accent)}
+
+  .timeline{position:relative}
+  .timeline::before{content:''; position:absolute; left:13px; top:12px; bottom:12px; width:2px; background:var(--border); z-index:0}
+  .node{position:relative; padding-left:44px; margin:0 0 16px}
+  .node-dot{position:absolute; left:3px; top:15px; width:22px; height:22px; border-radius:50%; display:flex;
+    align-items:center; justify-content:center; font-size:.72rem; z-index:1; border:3px solid var(--bg); background:var(--surface)}
+  .d-info{color:var(--info); box-shadow:inset 0 0 0 2px var(--info)}
+  .d-decision{color:var(--decision); box-shadow:inset 0 0 0 2px var(--decision)}
+  .d-build{color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent)}
+  .d-risk{color:var(--risk); box-shadow:inset 0 0 0 2px var(--risk)}
+  .d-done{color:var(--done); box-shadow:inset 0 0 0 2px var(--done)}
+
+  section.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); scroll-margin-top:16px; box-shadow:var(--shadow)}
+  details{margin:0}
+  summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:13px; padding:15px 19px; user-select:none}
+  summary::-webkit-details-marker{display:none}
+  .chev{width:14px; height:14px; flex:none; color:var(--ink-faint); transition:transform .18s ease}
+  details[open] .chev{transform:rotate(90deg)}
+  .s-num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.05rem; font-weight:720; color:var(--ink-faint); flex:none; letter-spacing:-.02em; min-width:1.6em}
+  .s-title{font-size:1.08rem; font-weight:690; flex:1; min-width:0; letter-spacing:-.01em}
+  .s-tag{font-size:.74rem; color:var(--ink-faint); font-weight:600}
+  .body{padding:2px 19px 19px 19px; border-top:1px solid var(--border)}
+  .body > :first-child{margin-top:14px}
+  .body p{margin:.55em 0; color:var(--ink-soft)} .body strong{color:var(--ink)}
+  .body ul{margin:.4em 0; padding-left:1.25em} .body li{margin:.3em 0; color:var(--ink-soft)}
+  h3{font-size:.95rem; margin:1.3em 0 .3em; color:var(--ink); font-weight:690; letter-spacing:-.01em}
+  h3:first-child{margin-top:.2em}
+
+  .tasks{list-style:none; margin:10px 0; padding:0}
+  .tasks li{display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom:1px dashed var(--border); color:var(--ink)}
+  .tasks li:last-child{border-bottom:none}
+  .tasks .ti{flex:none; margin-top:1px; font-size:.9rem}
+  .t-done .ti{color:var(--done)} .t-doing .ti{color:var(--accent)} .t-todo .ti{color:var(--ink-faint)}
+  .tasks .tx{flex:1; min-width:0} .tasks .tx small{display:block; color:var(--ink-faint); font-size:.82rem; margin-top:2px}
+
+  .q-bar{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin:12px 0 14px}
+  .q-summary{font-size:.85rem; color:var(--ink-soft)} .q-summary b{color:var(--ink)}
+  .copyans{font:inherit; font-size:.82rem; font-weight:650; color:#fff; background:var(--accent); border:none; padding:8px 14px; border-radius:8px; cursor:pointer}
+  .copyans:hover{filter:brightness(1.06)} .copyans.ok{background:var(--done)}
+  .q{border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--surface)}
+  .q.answered{border-color:color-mix(in srgb,var(--done) 45%,var(--border)); background:color-mix(in srgb,var(--done-bg) 50%,var(--surface))}
+  .q-head{display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap}
+  .q-state{flex:none; font-size:.73rem; font-weight:700; color:var(--ink-faint); display:inline-flex; align-items:center; gap:5px; padding-top:2px; min-width:88px}
+  .q.answered .q-state{color:var(--done)}
+  .q-text{flex:1; min-width:160px; font-weight:600; color:var(--ink)}
+  .q-flag{flex:none; font-size:.75rem; color:var(--ink-soft); display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none}
+  .q-flag input{accent-color:var(--risk); margin:0}
+  .q-opts{display:flex; flex-wrap:wrap; gap:6px; margin:11px 0 0}
+  .q-opt{font:inherit; font-size:.8rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--border); padding:5px 11px; border-radius:999px; cursor:pointer}
+  .q-opt:hover{border-color:var(--accent); color:var(--accent)}
+  .q-opt.sel{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+  .q-ans{width:100%; margin-top:9px; font:inherit; font-size:.88rem; color:var(--ink); background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; resize:vertical; min-height:38px}
+  .q-ans:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
+
+  .callout{display:flex; gap:11px; align-items:flex-start; padding:12px 14px; border-radius:9px; margin:12px 0; font-size:.93rem; line-height:1.5}
+  .callout .gi{flex:none; margin-top:1px}
+  .c-info{background:var(--info-bg); color:var(--info)} .c-info b,.c-info strong{color:var(--info)}
+  .c-risk{background:var(--risk-bg); color:var(--risk)} .c-risk b,.c-risk strong{color:var(--risk)}
+  .c-done{background:var(--done-bg); color:var(--done)} .c-done b,.c-done strong{color:var(--done)}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:.9rem}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+  th{font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:700}
+  tr:last-child td{border-bottom:none}
+
+  .codeblock{position:relative; margin:12px 0}
+  .codeblock pre{margin:0; background:#1f211d; color:#e7e6df; border-radius:9px; padding:14px 16px; overflow-x:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; line-height:1.55}
+  .copybtn{position:absolute; top:9px; right:9px; font:inherit; font-size:.72rem; font-weight:650; color:#cfcec6; background:#34362f; border:1px solid #4a4c43; padding:4px 9px; border-radius:6px; cursor:pointer}
+  .copybtn:hover{background:#42443b; color:#fff} .copybtn.ok{color:#9fe0b6; border-color:#3e6b4f}
+
+  .na{position:fixed; right:18px; bottom:18px; width:min(330px,calc(100vw - 36px)); background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-pop); z-index:50; overflow:hidden}
+  .na-head{display:flex; align-items:center; gap:9px; padding:11px 13px; background:var(--surface-2); border-bottom:1px solid var(--border)}
+  .na-head .t{font-weight:700; font-size:.86rem; flex:1}
+  .na-head .ct{font-size:.72rem; font-weight:700; color:#fff; background:var(--risk); border-radius:999px; padding:1px 8px}
+  .na-head .ct.clear{background:var(--done)}
+  .na-x{border:none; background:none; cursor:pointer; color:var(--ink-faint); font-size:1.05rem; line-height:1; padding:2px 4px} .na-x:hover{color:var(--ink)}
+  .na-list{list-style:none; margin:0; padding:6px; max-height:46vh; overflow:auto}
+  .na-list li a{display:flex; gap:9px; align-items:flex-start; padding:9px 10px; border-radius:8px; color:var(--ink); font-size:.85rem; line-height:1.4}
+  .na-list li a:hover{background:var(--surface-2); text-decoration:none}
+  .na-empty{padding:18px 14px; text-align:center; color:var(--ink-soft); font-size:.88rem}
+  .na-reopen{position:fixed; right:18px; bottom:18px; z-index:50; display:none; align-items:stretch; border-radius:999px; overflow:hidden; box-shadow:var(--shadow-pop)}
+  .na-reopen.show{display:inline-flex}
+  .na-reopen button{font:inherit; font-size:.8rem; font-weight:650; color:var(--bg); background:var(--ink); border:none; cursor:pointer}
+  .na-reopen .nr-main{padding:9px 13px; display:inline-flex; align-items:center; gap:7px}
+  .na-reopen .nr-x{padding:9px 12px; border-left:1px solid rgba(255,255,255,.22); font-weight:800}
+  .na-reopen button:hover{filter:brightness(1.35)}
+
+  .reveal{opacity:0; transform:translateY(10px)}
+  .reveal.in{opacity:1; transform:none; transition:opacity .24s ease, transform .24s ease}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1 !important; transform:none !important; transition:none !important} .chev{transition:none}
+  }
+  footer{border-top:1px solid var(--border); padding:22px 0 40px; color:var(--ink-faint); font-size:.82rem}
+  @media (max-width:820px){
+    .grid{grid-template-columns:1fr; gap:8px}
+    nav.toc{position:static; max-height:none; margin-bottom:6px; border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface)}
+    nav.toc ol{border-left:none; columns:2; column-gap:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="reveal">
+      <div class="eyebrow">PlanViewer · pre-ejecución</div>
+      <h1>Alineación del mock de buró con Equifax LATAM</h1>
+      <p class="tldr">Fase preparatoria mínima: agregar los <b>campos de altísima confianza</b> del contrato Equifax (<code>status</code>, <code>hitCode</code>, <code>links</code>), opcionalizar los operativos del request, y documentar el mapping al envelope probable — <b>sin refactor al shape <code>consumers.creditReport[]</code></b> (eso se hace en el adapter cuando llegue el sandbox real).</p>
+      <p class="readline">~<span id="readmins">?</span> min de lectura</p>
+    </div>
+    <div class="steps reveal" aria-label="Estado del plan">
+      <span class="step on"><span class="dot"></span>draft</span><span class="bar"></span>
+      <span class="step" id="stepApproved"><span class="dot"></span>approved</span><span class="bar"></span>
+      <span class="step"><span class="dot"></span>building</span>
+    </div>
+    <div class="stats reveal">
+      <div class="stat s-done"><span class="v">S</span><span class="l">esfuerzo (~2-3h)</span></div>
+      <div class="stat s-done"><span class="v">Zero</span><span class="l">downtime</span></div>
+      <div class="stat"><span class="v sm">types + endpoint + env</span><span class="l">blast radius</span></div>
+      <div class="stat s-done"><span class="n" data-to="0">0</span><span class="l">deps externas</span></div>
+      <div class="stat s-done"><span class="n" id="blockStat">0</span><span class="l">bloqueantes</span></div>
+      <div class="stat s-done"><span class="v">BAJO</span><span class="l">riesgo</span></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <nav class="toc" aria-label="Secciones"><p class="toc-h">En esta página</p><ol id="tocList"></ol></nav>
+
+    <main id="content">
+      <div class="controls reveal">
+        <button class="ctrl" id="expandAll">▾ Expandir todo</button>
+        <button class="ctrl" id="collapseAll">▸ Colapsar todo</button>
+      </div>
+
+      <div class="timeline">
+
+        <!-- 01 OVERVIEW -->
+        <div class="node reveal">
+          <span class="node-dot d-info" aria-hidden="true">●</span>
+          <section class="card" id="overview" data-title="Overview" data-accent="info">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">01</span><span class="s-title">Overview</span><span class="s-tag">empieza acá</span></summary>
+              <div class="body">
+                <p>Una investigación OSINT confirmó el contrato técnico base de una integración real de buró con Equifax LATAM: OAuth2 client credentials, REST/JSON, ambientes sandbox/uat/live, envelope con <code>status</code>, <code>hitCode</code> y <code>links[]</code>. Nuestro mock es funcionalmente correcto pero <strong>su shape es plano</strong> y diverge en varios campos operativos.</p>
+                <p>Este plan cierra las brechas de <strong>altísima confianza</strong> sin adivinar el namespace costarricense. La regla de la research fue explícita: el shape US OneView no debe copiarse literal al caso CR. Cuando llegue el sandbox real, un <code>equifax-client.ts</code> hará el mapeo envelope → nuestro modelo plano; este plan prepara ese día.</p>
+                <div class="callout c-info"><span class="gi" aria-hidden="true">●</span><div><strong>Resultado esperado.</strong> Tipos extendidos con status/hitCode/links, request que opcionalmente recibe campos operativos, mapping table documentada, 0 cambios de comportamiento para callers existentes, swap a Equifax real más barato.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 02 PHASES & TASKS -->
+        <div class="node reveal">
+          <span class="node-dot d-build" aria-hidden="true">▣</span>
+          <section class="card" id="phases" data-title="Fases y tareas" data-accent="accent">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">02</span><span class="s-title">Fases y tareas</span><span class="s-tag">8 subtareas · todas cheap</span></summary>
+              <div class="body">
+
+                <h3>Fase 1 · Tipos y mock generator</h3>
+                <ul class="tasks">
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S1: Extender <code>src/types/buro.ts</code> con <code>BuroReportStatus</code>, <code>BuroReportLink</code>, y campos <code>status</code>/<code>hitCode</code>/<code>links</code> en <code>BuroMockResponse</code>. Agregar mapping table en comentario al tope del archivo. <small>[tier: cheap] -- verify: <code>npm run typecheck</code></small></span></li>
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S2: Actualizar <code>mock-equifax.ts::generateMockBuroResponse</code> para poblar los nuevos campos fijos (<code>status:"completed"</code>, <code>hitCode:{code:"1"}</code>, <code>links:[]</code>). <small>[needs: S1] [tier: cheap] -- verify: typecheck</small></span></li>
+                </ul>
+
+                <h3>Fase 2 · Env vars y endpoint</h3>
+                <ul class="tasks">
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S3: Extender <code>PrecaliEnv</code> con <code>PRECALI_EQUIFAX_MEMBER_NUMBER</code>, <code>PRECALI_EQUIFAX_SECURITY_CODE</code>, <code>PRECALI_EQUIFAX_CUSTOMER_CODE</code> (todos string, default ""). <small>[tier: cheap] -- verify: typecheck</small></span></li>
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S4: Extender <code>bodySchema</code> en <code>app/api/buro/route.ts</code> con campos operativos opcionales (<code>customerReferenceIdentifier</code>, <code>memberNumber</code>, <code>securityCode</code>, <code>customerCode</code>). Handler los ignora en mock. <small>[needs: S3] [tier: cheap] -- when: POST con operativos / ensures: respuesta idéntica a sin ellos -- verify: <code>npm test -- buro</code></small></span></li>
+                </ul>
+
+                <h3>Fase 3 · Tests y data canónica</h3>
+                <ul class="tasks">
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S5: Actualizar <code>route.test.ts</code>: extender test CWE-532 a los nuevos campos operativos; agregar test "campos operativos no afectan la respuesta". <small>[needs: S4] [tier: cheap] -- verify: <code>npm test -- route</code></small></span></li>
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S6: Actualizar <code>mock-equifax.test.ts</code>: aserciones de <code>status==="completed"</code>, <code>hitCode.code==="1"</code>, <code>links===[]</code> en 100 cédulas. <small>[needs: S2] [tier: cheap] -- verify: <code>npm test -- mock-equifax</code></small></span></li>
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S7: Actualizar <code>find-cedulas-perfiles.ts</code> y regenerar <code>casos-prueba-buro.json</code> con los nuevos campos. <small>[needs: S2] [tier: cheap] -- verify: <code>npx tsx scripts/find-cedulas-perfiles.ts | head -3</code></small></span></li>
+                  <li class="t-todo"><span class="ti" aria-hidden="true">○</span><span class="tx">S8: Validación final: typecheck + tests + lint. Confirmar que <code>agent.test.ts</code> sigue pasando (PII invariant intacto). <small>[needs: S1-S7] [tier: cheap] -- verify: <code>npm test && npm run typecheck && npm run lint</code></small></span></li>
+                </ul>
+
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 03 DECISIONES -->
+        <div class="node reveal">
+          <span class="node-dot d-decision" aria-hidden="true">◆</span>
+          <section class="card" id="decisions" data-title="Decisiones" data-accent="decision">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">03</span><span class="s-title">Decisiones</span><span class="s-tag">6 bloqueadas</span></summary>
+              <div class="body">
+                <table>
+                  <thead><tr><th>#</th><th>Decisión</th><th>Estado</th></tr></thead>
+                  <tbody>
+                    <tr><td>1</td><td><strong>Opción C (híbrido)</strong> — agregar solo campos de altísima confianza + opcionalizar operativos + documentar mapping. NO refactor al envelope <code>consumers.creditReport[]</code>. Confirmada por el usuario.</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                    <tr><td>2</td><td><strong>Shape plano se mantiene</strong> — <code>BuroMockResponse</code> sigue siendo nuestro "domain model" interno; el adapter futuro hace la traducción al envelope Equifax.</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                    <tr><td>3</td><td><strong><code>status</code> siempre <code>"completed"</code></strong> en mock. El type admite <code>"pending"</code>/<code>"error"</code> para forward-compat, pero el mock no los genera hasta que existan casos reales.</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                    <tr><td>4</td><td><strong><code>hitCode</code> siempre <code>{ code: "1" }</code></strong> en mock. Shape fiel a Equifax US; <code>"0"</code> (no-hit) requiere modelar consumers no encontrados, no aplica con cédula CR válida determinística.</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                    <tr><td>5</td><td><strong><code>links</code> siempre <code>[]</code></strong> en mock. Cuando el cliente real devuelva links, se validan contra allowlist antes de cualquier fetch (CWE-918/SSRF).</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                    <tr><td>6</td><td><strong>Campos operativos del request se ignoran en mock</strong> — si se usaran como inputs, dos calls idénticas con distinto <code>memberNumber</code> tendrían que devolver respuestas distintas, rompiendo el determinismo por cédula.</td><td><span class="badge b-decision"><span aria-hidden="true">◆</span> elegido</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 04 RIESGOS -->
+        <div class="node reveal">
+          <span class="node-dot d-risk" aria-hidden="true">▲</span>
+          <section class="card" id="risks" data-title="Riesgos" data-accent="risk">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">04</span><span class="s-title">Riesgos</span><span class="s-tag">4 invariantes</span></summary>
+              <div class="body">
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-532 · Logging de credenciales operativas.</strong> <code>memberNumber</code>/<code>securityCode</code>/<code>customerCode</code> son credenciales del cliente en Equifax. El log <code>[buro]</code> solo registra <code>{ts, category, score}</code>; los nuevos campos del request se descartan explícitamente. Test CWE-532 se extiende a los nuevos campos.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-200 · Invariante PII (INV-1).</strong> Solo <code>riskLevel</code> (1/2/3) llega al LLM. Los nuevos campos (<code>status</code>, <code>hitCode</code>, <code>links</code>) se quedan en HTTP/engine y nunca se interpolan en <code>SYSTEM_PROMPT_TEMPLATE</code> ni en <code>riskLevelInstruction</code>.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>CWE-918 · <code>links[].href</code> como URL no confiable.</strong> El type lo permite; cuando llegue el real, debe validarse contra allowlist de hosts de Equifax antes de cualquier fetch automático. El motor NO debe seguir links automáticamente; el caller decide. Mock siempre devuelve <code>[]</code>.</div></div>
+                <div class="callout c-risk"><span class="gi" aria-hidden="true">▲</span><div><strong>Determinismo por cédula (CWE-20 inverso).</strong> Los campos operativos del request NO deben sesgar el resultado simulado. Dos calls con el mismo <code>idNumber</code> y distinto <code>memberNumber</code> devuelven respuesta idéntica. Test explícito en S5.</div></div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- 05 OPEN QUESTIONS -->
+        <div class="node reveal">
+          <span class="node-dot d-info" aria-hidden="true">?</span>
+          <section class="card" id="open" data-title="Preguntas abiertas" data-accent="info">
+            <details open>
+              <summary><svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="s-num">05</span><span class="s-title">Preguntas abiertas</span><span class="s-tag" id="openTag">gestioná acá</span></summary>
+              <div class="body">
+                <div class="q-bar">
+                  <button class="copyans" id="copyAns">Copiar respuestas para Claude</button>
+                  <span class="q-summary" id="qSummary"></span>
+                </div>
+
+                <div class="q" data-id="hit-code-description" data-blocking="false">
+                  <div class="q-head">
+                    <span class="q-state"><span class="gi" aria-hidden="true">○</span><span class="lbl">abierta</span></span>
+                    <span class="q-text">¿<code>hitCode</code> debe incluir también un campo <code>description</code> además de <code>code</code>?</span>
+                    <label class="q-flag"><input type="checkbox" class="q-blocking"> bloqueante</label>
+                  </div>
+                  <div class="q-opts">
+                    <button type="button" class="q-opt">Solo code (default)</button>
+                    <button type="button" class="q-opt">Agregar description ahora</button>
+                    <button type="button" class="q-opt">Esperar sandbox real</button>
+                  </div>
+                  <textarea class="q-ans" placeholder="Ej: solo code por ahora, se agrega description cuando el sandbox lo devuelva."></textarea>
+                </div>
+
+                <div class="q" data-id="operational-required-when-real" data-blocking="false">
+                  <div class="q-head">
+                    <span class="q-state"><span class="gi" aria-hidden="true">○</span><span class="lbl">abierta</span></span>
+                    <span class="q-text">¿Los campos operativos (<code>memberNumber</code> etc.) deben ser requeridos cuando el cliente real esté disponible?</span>
+                    <label class="q-flag"><input type="checkbox" class="q-blocking"> bloqueante</label>
+                  </div>
+                  <div class="q-opts">
+                    <button type="button" class="q-opt">Opcionales siempre, handler decide por env var (default)</button>
+                    <button type="button" class="q-opt">Requeridos si PRECALI_EQUIFAX_* está seteada</button>
+                  </div>
+                  <textarea class="q-ans" placeholder="Ej: opcionales siempre, la lógica real vive en el futuro equifax-client.ts."></textarea>
+                </div>
+              </div>
+            </details>
+          </section>
+        </div>
+      </div>
+
+      <footer>Generado desde <code>plans/2026-07-07-buro-equifax-alignment/plan.md</code> · no editar a mano · regenerable on demand · PlanViewer</footer>
+    </main>
+  </div>
+</div>
+
+<aside class="na" id="na" aria-label="Needs attention">
+  <div class="na-head"><span aria-hidden="true" style="color:var(--risk)">▲</span><span class="t">Needs attention</span>
+    <span class="ct" id="naCount">4</span><button class="na-x" id="naClose" aria-label="Cerrar panel">×</button></div>
+  <ul class="na-list" id="naList">
+    <li class="na-risk"><a href="#risks"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>CWE-532 · Logging de credenciales</strong> — test extendido a nuevos campos</span></a></li>
+    <li class="na-risk"><a href="#risks"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>CWE-200 · INV-1 PII</strong> — nuevos campos no llegan al LLM</span></a></li>
+    <li class="na-risk"><a href="#risks"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>CWE-918 · <code>links[].href</code> no confiable</strong> — validar contra allowlist antes de fetch</span></a></li>
+    <li class="na-risk"><a href="#risks"><span style="color:var(--risk)" aria-hidden="true">▲</span><span><strong>Determinismo (CWE-20 inverso)</strong> — operativos del request se ignoran</span></a></li>
+  </ul>
+</aside>
+<div class="na-reopen" id="naReopen"><button class="nr-main" id="naReopenMain"><span aria-hidden="true">▲</span> Needs attention (<span id="naReopenN">4</span>)</button><button class="nr-x" id="naReopenX" aria-label="Ocultar del todo">×</button></div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var mins = 1;
+  try{ var txt=(document.getElementById('content').innerText||'').trim();
+    var words=txt?txt.split(/\s+/).length:0; mins=Math.max(1,Math.ceil(words/238)); }catch(e){}
+
+  function countUp(el,to,prefix,suffix){
+    if(reduce){ el.textContent=(prefix||'')+to+(suffix||''); return; }
+    var start=null;
+    function tick(ts){ if(!start)start=ts; var p=Math.min(1,(ts-start)/900);
+      el.textContent=(prefix||'')+Math.round((1-Math.pow(1-p,3))*to)+(suffix||''); if(p<1)requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  }
+  var rl=document.getElementById('readmins'); if(rl) rl.textContent=mins;
+  document.querySelectorAll('.stat .n').forEach(function(el){
+    if(el.id==='blockStat') return;
+    countUp(el,parseInt(el.getAttribute('data-to')||'0',10),el.getAttribute('data-prefix')||'',el.getAttribute('data-suffix')||'');
+  });
+
+  var secs=[].slice.call(document.querySelectorAll('section.card[data-title]'));
+  var tocList=document.getElementById('tocList'), links={};
+  secs.forEach(function(s){ var li=document.createElement('li'), a=document.createElement('a');
+    a.href='#'+s.id; a.textContent=s.getAttribute('data-title'); li.appendChild(a); tocList.appendChild(li); links[s.id]=a; });
+  var spy=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){
+    Object.keys(links).forEach(function(k){links[k].classList.remove('here');});
+    if(links[en.target.id])links[en.target.id].classList.add('here'); } }); },
+    {rootMargin:'-12% 0px -70% 0px',threshold:0});
+  secs.forEach(function(s){ spy.observe(s); });
+
+  var reveals=[].slice.call(document.querySelectorAll('.reveal'));
+  if(reduce){ reveals.forEach(function(el){ el.classList.add('in'); }); }
+  else{ var io=new IntersectionObserver(function(es,obs){ es.forEach(function(en){
+    if(en.isIntersecting){ en.target.classList.add('in'); obs.unobserve(en.target); } }); },
+    {rootMargin:'0px 0px -8% 0px',threshold:.06}); reveals.forEach(function(el){ io.observe(el); }); }
+
+  function setAll(o){ document.querySelectorAll('section.card details').forEach(function(d){ d.open=o; }); }
+  document.getElementById('expandAll').addEventListener('click',function(){ setAll(true); });
+  document.getElementById('collapseAll').addEventListener('click',function(){ setAll(false); });
+
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click',function(){ var pre=btn.parentElement.querySelector('pre'); var t=pre?pre.innerText:'';
+      function ok(){ var o=btn.textContent; btn.textContent='Copiado ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent=o; btn.classList.remove('ok'); },1400); }
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(ok).catch(function(){fb(t,ok);}); } else fb(t,ok); }); });
+  function fb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+
+  var na=document.getElementById('na'), reopen=document.getElementById('naReopen');
+  document.getElementById('naClose').addEventListener('click',function(){ na.style.display='none'; reopen.classList.add('show'); });
+  document.getElementById('naReopenMain').addEventListener('click',function(){ na.style.display=''; reopen.classList.remove('show'); });
+  document.getElementById('naReopenX').addEventListener('click',function(){ reopen.classList.remove('show'); });
+})();
+
+(function(){
+  "use strict";
+  var qs=[].slice.call(document.querySelectorAll('.q'));
+  if(!qs.length) return;
+  var STORE='haq-open-'+((location.pathname.split('/').pop())||'plan');
+  var mem={};
+  function load(){ try{ return JSON.parse(localStorage.getItem(STORE))||{}; }catch(e){ return mem; } }
+  function save(d){ try{ localStorage.setItem(STORE,JSON.stringify(d)); }catch(e){ mem=d; } }
+  var state=load();
+
+  var naList=document.getElementById('naList'),
+      naCount=document.getElementById('naCount'),
+      naReopenN=document.getElementById('naReopenN'),
+      stepApproved=document.getElementById('stepApproved'),
+      blockStat=document.getElementById('blockStat'),
+      qSummary=document.getElementById('qSummary'),
+      openTag=document.getElementById('openTag'),
+      baseRisks=naList?naList.querySelectorAll('.na-risk').length:0;
+
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function ansOf(q){ var t=q.querySelector('.q-ans'); return t?t.value.trim():''; }
+
+  function persist(){
+    var d={};
+    qs.forEach(function(q){ d[q.getAttribute('data-id')]={a:ansOf(q),b:q.querySelector('.q-blocking').checked}; });
+    save(d);
+  }
+
+  function refresh(){
+    var answered=0, pendingBlock=0, total=qs.length;
+    if(naList){ [].slice.call(naList.querySelectorAll('.na-q')).forEach(function(li){ li.remove(); }); }
+    qs.forEach(function(q){
+      var ans=ansOf(q), blocking=q.querySelector('.q-blocking').checked;
+      q.classList.toggle('answered',!!ans);
+      var lbl=q.querySelector('.q-state .lbl'), ico=q.querySelector('.q-state .gi');
+      if(lbl) lbl.textContent=ans?'respondida':'abierta';
+      if(ico) ico.textContent=ans?'✓':'○';
+      if(ans) answered++;
+      if(blocking&&!ans){
+        pendingBlock++;
+        if(naList){
+          var li=document.createElement('li'); li.className='na-q';
+          li.innerHTML='<a href="#open"><span style="color:var(--info)" aria-hidden="true">?</span><span><strong>'+esc(q.querySelector('.q-text').textContent)+'</strong> — bloqueante sin responder</span></a>';
+          naList.appendChild(li);
+        }
+      }
+    });
+    var naTotal=baseRisks+pendingBlock;
+    if(naCount){ naCount.textContent=naTotal; naCount.classList.toggle('clear',naTotal===0); }
+    if(naReopenN) naReopenN.textContent=naTotal;
+    if(openTag) openTag.textContent=(total-answered)+' sin responder';
+    if(qSummary) qSummary.innerHTML='<b>'+answered+'/'+total+'</b> respondidas · <b>'+pendingBlock+'</b> bloqueantes pendientes';
+    if(stepApproved) stepApproved.classList.toggle('on',pendingBlock===0);
+    if(blockStat){
+      blockStat.textContent=pendingBlock;
+      if(blockStat.parentElement){ blockStat.parentElement.classList.toggle('s-done',pendingBlock===0); blockStat.parentElement.classList.toggle('s-risk',pendingBlock>0); }
+    }
+  }
+
+  qs.forEach(function(q){
+    var id=q.getAttribute('data-id'), ta=q.querySelector('.q-ans'), blk=q.querySelector('.q-blocking');
+    if(state[id]){ if(ta&&state[id].a!=null) ta.value=state[id].a; if(blk&&state[id].b!=null) blk.checked=state[id].b; }
+    q.querySelectorAll('.q-opt').forEach(function(opt){
+      if(ta&&ta.value.trim()===opt.textContent.trim()) opt.classList.add('sel');
+      opt.addEventListener('click',function(){
+        q.querySelectorAll('.q-opt').forEach(function(o){ o.classList.remove('sel'); });
+        opt.classList.add('sel'); if(ta) ta.value=opt.textContent.trim(); persist(); refresh();
+      });
+    });
+    if(ta) ta.addEventListener('input',function(){
+      q.querySelectorAll('.q-opt').forEach(function(o){ o.classList.toggle('sel',o.textContent.trim()===ta.value.trim()); });
+      persist(); refresh();
+    });
+    if(blk) blk.addEventListener('change',function(){ persist(); refresh(); });
+  });
+
+  var copyBtn=document.getElementById('copyAns');
+  if(copyBtn) copyBtn.addEventListener('click',function(){
+    var dec=[], pendB=[];
+    qs.forEach(function(q){
+      var ans=ansOf(q), blocking=q.querySelector('.q-blocking').checked;
+      var qt=q.querySelector('.q-text').textContent.trim();
+      if(ans) dec.push('para «'+qt+'», '+ans);
+      else if(blocking) pendB.push('«'+qt+'»');
+    });
+    var text;
+    if(dec.length) text='Seguí con el plan aplicando estas decisiones: '+dec.join('; ')+'.';
+    else if(pendB.length) text='Todavía no tomé decisiones sobre las preguntas abiertas del plan.';
+    else text='Seguí con el plan tal como está; no tengo cambios sobre las preguntas abiertas.';
+    if(pendB.length) text+='\nSin responder (bloqueante'+(pendB.length>1?'s':'')+'): '+pendB.join(', ')+'.';
+    function ok(){ copyBtn.textContent='Copiado ✓'; copyBtn.classList.add('ok');
+      setTimeout(function(){ copyBtn.textContent='Copiar respuestas para Claude'; copyBtn.classList.remove('ok'); },1500); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(function(){ qfb(text,ok); }); } else qfb(text,ok);
+  });
+  function qfb(t,cb){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }catch(e){} }
+
+  refresh();
+})();
+</script>
+</body>
+</html>
