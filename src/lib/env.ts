@@ -26,6 +26,9 @@ export interface PrecaliEnv {
   // Feature flags
   PRECALI_INTERACTIVE_DELAY_MS: string;
   PRECALI_LIVE_WEB_DISABLED: string;
+  // Buro mock endpoint — si esta vacio, /api/buro es publico (modo desarrollo).
+  // Si esta seteada, exige header `x-api-key` coincidente (CWE-306).
+  PRECALI_BURO_API_KEY: string;
 }
 
 type EnvKey = keyof PrecaliEnv;
@@ -61,6 +64,7 @@ export function getEnv(): PrecaliEnv {
     KV_REST_API_TOKEN: read("KV_REST_API_TOKEN"),
     PRECALI_INTERACTIVE_DELAY_MS: read("PRECALI_INTERACTIVE_DELAY_MS"),
     PRECALI_LIVE_WEB_DISABLED: read("PRECALI_LIVE_WEB_DISABLED"),
+    PRECALI_BURO_API_KEY: read("PRECALI_BURO_API_KEY"),
   };
 }
 
