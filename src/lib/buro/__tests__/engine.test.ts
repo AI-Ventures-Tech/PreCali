@@ -20,6 +20,9 @@ function makeBuro(overrides: Partial<BuroMockResponse> = {}): BuroMockResponse {
     commercialProtests: 0,
     historyMonths: 48,
     inquiryDate: "2026-01-01T00:00:00.000Z",
+    status: "completed",
+    hitCode: { code: "1" },
+    links: [],
     ...overrides,
   };
 }

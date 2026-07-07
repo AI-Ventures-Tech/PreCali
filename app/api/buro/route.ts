@@ -29,6 +29,10 @@ const bodySchema = z.object({
   // Strict CR-format validation (X-XXXX-XXXXX) can be added later without breaking
   // the API, once the exact format accepted by Equifax is confirmed.
   idNumber: z.string().trim().min(3, "idNumber required (min 3 chars)"),
+  customerReferenceIdentifier: z.string().trim().optional(),
+  memberNumber: z.string().trim().optional(),
+  securityCode: z.string().trim().optional(),
+  customerCode: z.string().trim().optional(),
 });
 
 function clientIp(req: Request): string {

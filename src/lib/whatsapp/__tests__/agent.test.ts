@@ -29,13 +29,13 @@ describe("whatsapp/agent buildSystemPrompt — tone by risk level", () => {
     expect(prompt).toContain("conversion rapida");
   });
 
-  it("never leaks raw bureau fields (score, sugefCategory, operations, protests)", () => {
+  it("never leaks raw bureau fields (score, sugefCategory, operations, protests, hitCode, links)", () => {
     // ResolverDudaContext only carries riskLevel (a number), so structurally there
     // is no way for a raw bureau field to reach here. This test documents and
     // pins that invariant.
     for (const level of [1, 2, 3] as const) {
       const prompt = buildSystemPrompt({ ...BASE_CONTEXT, riskLevel: level });
-      expect(prompt).not.toMatch(/sugefCategory|commercialProtests|totalAmountOwed|inquiriesLast30Days/i);
+      expect(prompt).not.toMatch(/sugefCategory|commercialProtests|totalAmountOwed|inquiriesLast30Days|hitCode|links/i);
     }
   });
 });

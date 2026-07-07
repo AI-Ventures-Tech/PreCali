@@ -189,5 +189,8 @@ export function generateMockBuroResponse(
     commercialProtests,
     historyMonths: 48,
     inquiryDate,
+    status: "completed" as const,
+    hitCode: { code: "1" },
+    links: [],
   };
 }

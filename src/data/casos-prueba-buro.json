@@ -15,7 +15,12 @@
     "isCreditShopping": false,
     "operations": 1,
     "exactMatch": true,
-    "story": "Heavily over-indebted, damaged history"
+    "story": "Heavily over-indebted, damaged history",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "María",
@@ -33,7 +38,12 @@
     "isCreditShopping": false,
     "operations": 3,
     "exactMatch": true,
-    "story": "Severe active default (>90 days)"
+    "story": "Severe active default (>90 days)",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "José",
@@ -51,7 +61,12 @@
     "isCreditShopping": false,
     "operations": 1,
     "exactMatch": true,
-    "story": "Low income, low category"
+    "story": "Low income, low category",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Ana",
@@ -69,7 +84,12 @@
     "isCreditShopping": false,
     "operations": 4,
     "exactMatch": true,
-    "story": "Low category with credit shopping"
+    "story": "Low category with credit shopping",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Carlos",
@@ -87,7 +107,12 @@
     "isCreditShopping": false,
     "operations": 1,
     "exactMatch": true,
-    "story": "B2 — upper boundary of high risk"
+    "story": "B2 — upper boundary of high risk",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Luis",
@@ -105,7 +130,12 @@
     "isCreditShopping": false,
     "operations": 2,
     "exactMatch": true,
-    "story": "B1 with low score (recovering history)"
+    "story": "B1 with low score (recovering history)",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Sofía",
@@ -123,7 +153,12 @@
     "isCreditShopping": false,
     "operations": 1,
     "exactMatch": true,
-    "story": "A2 but over-indebted (ratio > 0.50 → cap)"
+    "story": "A2 but over-indebted (ratio > 0.50 → cap)",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Diego",
@@ -141,7 +176,12 @@
     "isCreditShopping": false,
     "operations": 2,
     "exactMatch": true,
-    "story": "B1 with score < 700"
+    "story": "B1 with score < 700",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Elena",
@@ -159,7 +199,12 @@
     "isCreditShopping": false,
     "operations": 4,
     "exactMatch": false,
-    "story": "A2 with insufficient score"
+    "story": "A2 with insufficient score",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Marco",
@@ -177,7 +222,12 @@
     "isCreditShopping": false,
     "operations": 1,
     "exactMatch": true,
-    "story": "B1 with ratio at the limit"
+    "story": "B1 with ratio at the limit",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Patricia",
@@ -195,7 +245,12 @@
     "isCreditShopping": false,
     "operations": 4,
     "exactMatch": true,
-    "story": "A1 — premium customer"
+    "story": "A1 — premium customer",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Roberto",
@@ -213,7 +268,12 @@
     "isCreditShopping": false,
     "operations": 3,
     "exactMatch": true,
-    "story": "Solid A2, high income"
+    "story": "Solid A2, high income",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Carmen",
@@ -231,7 +291,12 @@
     "isCreditShopping": false,
     "operations": 0,
     "exactMatch": true,
-    "story": "A2 with clean history"
+    "story": "A2 with clean history",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Andrés",
@@ -249,7 +314,12 @@
     "isCreditShopping": false,
     "operations": 3,
     "exactMatch": true,
-    "story": "B1 with high score"
+    "story": "B1 with high score",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   },
   {
     "nombre": "Gabriela",
@@ -267,6 +337,11 @@
     "isCreditShopping": false,
     "operations": 2,
     "exactMatch": true,
-    "story": "A1 — premium income"
+    "story": "A1 — premium income",
+    "status": "completed",
+    "hitCode": {
+      "code": "1"
+    },
+    "links": []
   }
 ]

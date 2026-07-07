@@ -11,7 +11,7 @@
 
 import { generateMockBuroResponse } from "@/lib/buro/mock-equifax";
 import { scoreLead } from "@/lib/buro/engine";
-import type { SugefCategory } from "@/types/buro";
+import type { SugefCategory, BuroReportStatus, BuroReportLink } from "@/types/buro";
 
 interface Persona {
   nombre: string;
@@ -151,6 +151,9 @@ interface Match {
   operations: number;
   exactMatch: boolean;
   story: string;
+  status: BuroReportStatus;
+  hitCode: { code: string };
+  links: BuroReportLink[];
 }
 
 function findCedula(persona: Persona, maxAttempts = 30_000): Match | null {
@@ -182,6 +185,9 @@ function findCedula(persona: Persona, maxAttempts = 30_000): Match | null {
       operations: buro.operations.length,
       exactMatch,
       story: persona.story,
+      status: buro.status,
+      hitCode: buro.hitCode,
+      links: buro.links,
     };
 
     if (exactMatch) return match;

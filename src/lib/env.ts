@@ -29,6 +29,9 @@ export interface PrecaliEnv {
   // Buro mock endpoint — si esta vacio, /api/buro es publico (modo desarrollo).
   // Si esta seteada, exige header `x-api-key` coincidente (CWE-306).
   PRECALI_BURO_API_KEY: string;
+  PRECALI_EQUIFAX_MEMBER_NUMBER: string;
+  PRECALI_EQUIFAX_SECURITY_CODE: string;
+  PRECALI_EQUIFAX_CUSTOMER_CODE: string;
 }
 
 type EnvKey = keyof PrecaliEnv;
@@ -65,6 +68,9 @@ export function getEnv(): PrecaliEnv {
     PRECALI_INTERACTIVE_DELAY_MS: read("PRECALI_INTERACTIVE_DELAY_MS"),
     PRECALI_LIVE_WEB_DISABLED: read("PRECALI_LIVE_WEB_DISABLED"),
     PRECALI_BURO_API_KEY: read("PRECALI_BURO_API_KEY"),
+    PRECALI_EQUIFAX_MEMBER_NUMBER: read("PRECALI_EQUIFAX_MEMBER_NUMBER"),
+    PRECALI_EQUIFAX_SECURITY_CODE: read("PRECALI_EQUIFAX_SECURITY_CODE"),
+    PRECALI_EQUIFAX_CUSTOMER_CODE: read("PRECALI_EQUIFAX_CUSTOMER_CODE"),
   };
 }
 

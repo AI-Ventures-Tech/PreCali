@@ -32,4 +32,22 @@ describe("buro/mock-equifax", () => {
       expect(generateMockBuroResponse(`cedula-${i}`, DATE).historyMonths).toBe(48);
     }
   });
+
+  it("status is always 'completed' in mock", () => {
+    for (let i = 0; i < 100; i++) {
+      expect(generateMockBuroResponse(`cedula-${i}`, DATE).status).toBe("completed");
+    }
+  });
+
+  it("hitCode is always { code: '1' } in mock", () => {
+    for (let i = 0; i < 100; i++) {
+      expect(generateMockBuroResponse(`cedula-${i}`, DATE).hitCode).toEqual({ code: "1" });
+    }
+  });
+
+  it("links is always empty array in mock", () => {
+    for (let i = 0; i < 100; i++) {
+      expect(generateMockBuroResponse(`cedula-${i}`, DATE).links).toEqual([]);
+    }
+  });
 });

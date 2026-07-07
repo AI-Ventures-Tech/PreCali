@@ -85,14 +85,45 @@ describe("POST /api/buro", () => {
 
   it("does NOT log the idNumber raw value (CWE-532)", async () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
-    await POST(req({ idNumber: "3-9999-9999" }));
+    await POST(
+      req({
+        idNumber: "3-9999-9999",
+        memberNumber: "secret-123",
+        securityCode: "456",
+        customerCode: "789",
+      }),
+    );
     expect(spy).toHaveBeenCalledOnce();
     const [tag, payload] = spy.mock.calls[0]!;
     expect(tag).toBe("[buro]");
     // The log carries category/score/ts but never the cédula or raw payload.
     expect(payload).not.toHaveProperty("idNumber");
     expect(payload).not.toHaveProperty("operations");
-    expect(JSON.stringify(payload)).not.toContain("3-9999-9999");
+    expect(payload).not.toHaveProperty("memberNumber");
+    expect(payload).not.toHaveProperty("securityCode");
+    expect(payload).not.toHaveProperty("customerCode");
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("3-9999-9999");
+    expect(serialized).not.toContain("secret-123");
+    expect(serialized).not.toContain("456");
+    expect(serialized).not.toContain("789");
+  });
+
+  it("operational fields do not affect the deterministic response", async () => {
+    const without = await POST(req({ idNumber: "1-2345-6789" }));
+    const with_ = await POST(
+      req({
+        idNumber: "1-2345-6789",
+        memberNumber: "X",
+        securityCode: "Y",
+        customerCode: "Z",
+      }),
+    );
+    const jWithout = await without.json();
+    const jWith = await with_.json();
+    const { inquiryDate: _a, ...restA } = jWithout.data;
+    const { inquiryDate: _b, ...restB } = jWith.data;
+    expect(restA).toEqual(restB);
   });
 
   it("returns 429 after the (N+1)th request from the same IP (limit=5)", async () => {
